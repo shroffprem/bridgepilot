@@ -14,6 +14,7 @@ import Borrowers from '@/pages/Borrowers';
 import Reports from '@/pages/Reports';
 import MasterDirectory from '@/pages/MasterDirectory';
 import Admin from '@/pages/Admin';
+import Approvals from '@/pages/Approvals';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -46,6 +47,7 @@ const AuthenticatedApp = () => {
         <Route path="/reports" element={<Reports />} />
         <Route path="/directory" element={<MasterDirectory />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/approvals" element={<Approvals />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

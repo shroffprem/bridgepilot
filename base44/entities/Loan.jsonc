@@ -22,14 +22,6 @@
       "type": "number",
       "description": "Amount to be transferred (\u20b9)"
     },
-    "interest_rate": {
-      "type": "number",
-      "description": "Annual interest rate in %"
-    },
-    "tenure_days": {
-      "type": "number",
-      "description": "Loan duration in days"
-    },
     "disbursement_date": {
       "type": "string",
       "format": "date"
@@ -37,11 +29,7 @@
     "maturity_date": {
       "type": "string",
       "format": "date",
-      "description": "Due date for bullet repayment"
-    },
-    "total_repayable": {
-      "type": "number",
-      "description": "Principal + interest at maturity"
+      "description": "Due date"
     },
     "purpose": {
       "type": "string"
@@ -120,9 +108,6 @@
       "type": "string",
       "description": "Collateral / security offered"
     },
-    "processing_fee": {
-      "type": "number"
-    },
     "status": {
       "type": "string",
       "enum": [
@@ -171,8 +156,6 @@
   },
   "required": [
     "borrower_name",
-    "amount",
-    "interest_rate",
-    "tenure_days"
+    "amount"
   ]
 }

@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImageUploadField from '@/components/loans/ImageUploadField';
 import { formatINR, calcCharges, calcGST, calcOutstanding } from '@/lib/mis';
-import { BadgeCheck, Loader2 } from 'lucide-react';
+import { BadgeCheck, Loader2, ClipboardPaste } from 'lucide-react';
 
 export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) {
   const [saving, setSaving] = useState(false);
@@ -32,6 +32,11 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
   });
 
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
+
+  const pasteField = async (field) => {
+    const text = await navigator.clipboard.readText();
+    setForm(p => ({ ...p, [field]: text.trim() }));
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -88,7 +93,12 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
             </div>
             <div className="space-y-1">
               <Label>Credit Note / UTR No.</Label>
-              <Input value={form.credit_note_number} onChange={set('credit_note_number')} placeholder="e.g. UTR789012" />
+              <div className="flex gap-1">
+                <Input value={form.credit_note_number} onChange={set('credit_note_number')} placeholder="e.g. UTR789012" />
+                <Button type="button" variant="outline" size="icon" onClick={() => pasteField('credit_note_number')} title="Paste from clipboard">
+                  <ClipboardPaste size={14} />
+                </Button>
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">

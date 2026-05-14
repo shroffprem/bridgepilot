@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImageUploadField from '@/components/loans/ImageUploadField';
 import { formatINR } from '@/lib/mis';
-import { Banknote, Loader2 } from 'lucide-react';
+import { Banknote, Loader2, ClipboardPaste } from 'lucide-react';
 
 export default function DisbursalDialog({ loan, open, onOpenChange, onSaved }) {
   const [saving, setSaving] = useState(false);
@@ -22,6 +22,11 @@ export default function DisbursalDialog({ loan, open, onOpenChange, onSaved }) {
   });
 
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
+
+  const pasteField = async (field) => {
+    const text = await navigator.clipboard.readText();
+    setForm(p => ({ ...p, [field]: text.trim() }));
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -64,7 +69,12 @@ export default function DisbursalDialog({ loan, open, onOpenChange, onSaved }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Debit Note / UTR No.</Label>
-              <Input value={form.debit_note_number} onChange={set('debit_note_number')} placeholder="e.g. UTR123456" />
+              <div className="flex gap-1">
+                <Input value={form.debit_note_number} onChange={set('debit_note_number')} placeholder="e.g. UTR123456" />
+                <Button type="button" variant="outline" size="icon" onClick={() => pasteField('debit_note_number')} title="Paste from clipboard">
+                  <ClipboardPaste size={14} />
+                </Button>
+              </div>
             </div>
             <div className="space-y-1">
               <Label>Debit Note Date</Label>

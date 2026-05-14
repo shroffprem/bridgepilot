@@ -2,11 +2,7 @@
 
 export function formatINR(n) {
   if (!n && n !== 0) return '₹0';
-  const abs = Math.abs(n);
-  if (abs >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
-  if (abs >= 100000) return `₹${(n / 100000).toFixed(2)}L`;
-  if (abs >= 1000) return `₹${(n / 1000).toFixed(0)}K`;
-  return `₹${n.toLocaleString('en-IN')}`;
+  return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 export function formatINRFull(n) {

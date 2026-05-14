@@ -7,6 +7,7 @@ import {
   BarChart2,
   Building2,
   ChevronRight,
+  ShieldCheck,
 } from 'lucide-react';
 
 const navItems = [
@@ -15,6 +16,10 @@ const navItems = [
   { label: 'Reports', icon: BarChart2, path: '/reports' },
   { label: 'Borrowers', icon: Users, path: '/borrowers' },
   { label: 'Master Directory', icon: Building2, path: '/directory' },
+];
+
+const adminItems = [
+  { label: 'Admin', icon: ShieldCheck, path: '/admin' },
 ];
 
 export default function Sidebar() {
@@ -56,8 +61,27 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-sidebar-border">
-        <div className="text-sidebar-foreground text-xs opacity-40 text-center">
+      <div className="px-3 pb-2 border-t border-sidebar-border pt-3 space-y-1">
+        {adminItems.map(({ label, icon: Icon, path }) => {
+          const isActive = location.pathname === path;
+          return (
+            <Link
+              key={path}
+              to={path}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150',
+                isActive
+                  ? 'bg-sidebar-primary text-white'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )}
+            >
+              <Icon size={18} className="shrink-0" />
+              <span className="font-inter font-medium text-sm flex-1">{label}</span>
+              {isActive && <ChevronRight size={14} className="opacity-60" />}
+            </Link>
+          );
+        })}
+        <div className="text-sidebar-foreground text-xs opacity-40 text-center pt-2">
           © 2026 BridgeLine Partners
         </div>
       </div>

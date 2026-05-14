@@ -108,8 +108,8 @@ export default function LoanForm() {
           {/* Customer */}
           <SectionHeader title="Customer Details" />
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Customer Name" required>
-              <Input value={form.borrower_name} onChange={set('borrower_name')} placeholder="e.g. Pavana Kumara" required />
+            <Field label="Customer Name">
+              <Input value={form.borrower_name} onChange={set('borrower_name')} placeholder="e.g. Pavana Kumara" />
             </Field>
             <Field label="Mobile No.">
               <Input value={form.customer_mobile} onChange={set('customer_mobile')} placeholder="e.g. 98451 22023" />

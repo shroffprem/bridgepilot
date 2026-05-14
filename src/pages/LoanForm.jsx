@@ -100,7 +100,7 @@ export default function LoanForm() {
       </Button>
 
       <div className="bg-card rounded-xl border border-border p-6">
-        <h2 className="font-syne font-bold text-lg text-foreground mb-6">New Case — BridgeLine Partners</h2>
+        <h2 className="font-syne font-bold text-lg text-foreground mb-6">New Loan Application — BridgeLine Partners</h2>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <SmartPasteBox onParsed={merge} />

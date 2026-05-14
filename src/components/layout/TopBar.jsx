@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 const pageTitles = {
   '/': 'Dashboard',
   '/loans': 'Cases',
-  '/loans/new': 'New Case',
+  '/loans/new': 'New Loan Application',
   '/reports': 'Reports',
   '/borrowers': 'Borrowers',
   '/directory': 'Master Directory',

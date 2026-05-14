@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, CreditCard, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, CreditCard, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StatusBadge from '@/components/ui/StatusBadge';
+import ApprovalTrail from '@/components/loans/ApprovalTrail';
+import ApprovalActionPanel from '@/components/loans/ApprovalActionPanel';
 
 function formatINR(n) {
   if (!n) return '₹0';
@@ -34,8 +35,6 @@ export default function LoanDetail() {
   const [repayments, setRepayments] = useState([]);
   const [repayForm, setRepayForm] = useState({ amount_received: '', payment_date: format(new Date(), 'yyyy-MM-dd'), payment_mode: 'bank_transfer', reference_number: '', notes: '' });
   const [repayOpen, setRepayOpen] = useState(false);
-  const [rejectNotes, setRejectNotes] = useState('');
-  const [approveNotes, setApproveNotes] = useState('');
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -49,28 +48,6 @@ export default function LoanDetail() {
   };
 
   useEffect(() => { load(); }, [id]);
-
-  const handleApproveCluster = async () => {
-    const requiresZonal = loan.amount >= 1000000;
-    const update = requiresZonal
-      ? { status: 'pending_zonal_approval', approval_stage: 'zonal', cluster_manager_notes: approveNotes, approved_by_cluster: 'Current User' }
-      : { status: 'approved', approval_stage: 'complete', cluster_manager_notes: approveNotes, approved_by_cluster: 'Current User' };
-    await base44.entities.Loan.update(id, update);
-    setApproveNotes('');
-    load();
-  };
-
-  const handleApproveZonal = async () => {
-    await base44.entities.Loan.update(id, { status: 'approved', approval_stage: 'complete', zonal_manager_notes: approveNotes, approved_by_zonal: 'Current User' });
-    setApproveNotes('');
-    load();
-  };
-
-  const handleReject = async () => {
-    await base44.entities.Loan.update(id, { status: 'rejected', rejection_reason: rejectNotes });
-    setRejectNotes('');
-    load();
-  };
 
   const handleDisburse = async () => {
     await base44.entities.Loan.update(id, { status: 'disbursed' });
@@ -117,18 +94,6 @@ export default function LoanDetail() {
           <div className="text-sm text-muted-foreground font-mono">{loan.loan_number}</div>
         </div>
         <div className="flex gap-2">
-          {loan.status === 'pending_cluster_approval' && (
-            <>
-              <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={handleApproveCluster}><CheckCircle2 size={14} /> Approve (Cluster)</Button>
-              <Button size="sm" variant="destructive" className="gap-1" onClick={handleReject}><XCircle size={14} /> Reject</Button>
-            </>
-          )}
-          {loan.status === 'pending_zonal_approval' && (
-            <>
-              <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={handleApproveZonal}><CheckCircle2 size={14} /> Approve (Zonal)</Button>
-              <Button size="sm" variant="destructive" className="gap-1" onClick={handleReject}><XCircle size={14} /> Reject</Button>
-            </>
-          )}
           {loan.status === 'approved' && (
             <Button size="sm" className="gap-1" onClick={handleDisburse}>Mark Disbursed</Button>
           )}
@@ -160,35 +125,11 @@ export default function LoanDetail() {
         <Field label="Cluster" value={loan.cluster} />
       </div>
 
-      {/* Approval Notes */}
-      {(loan.cluster_manager_notes || loan.zonal_manager_notes || loan.rejection_reason) && (
-        <div className="bg-card rounded-xl border border-border p-5 space-y-3">
-          <h3 className="font-syne font-semibold text-sm">Approval Notes</h3>
-          {loan.cluster_manager_notes && <div className="text-sm"><span className="text-muted-foreground">Cluster: </span>{loan.cluster_manager_notes}</div>}
-          {loan.zonal_manager_notes && <div className="text-sm"><span className="text-muted-foreground">Zonal: </span>{loan.zonal_manager_notes}</div>}
-          {loan.rejection_reason && <div className="text-sm text-destructive"><span className="font-medium">Rejection reason: </span>{loan.rejection_reason}</div>}
-        </div>
-      )}
-
-      {/* Approval action notes area */}
-      {['pending_cluster_approval', 'pending_zonal_approval'].includes(loan.status) && (
-        <div className="bg-card rounded-xl border border-border p-5 space-y-3">
-          <Label>Notes (optional)</Label>
-          <Textarea value={approveNotes} onChange={e => setApproveNotes(e.target.value)} rows={2} placeholder="Add any notes for your decision…" />
-          {loan.status === 'pending_cluster_approval' && (
-            <div className="flex gap-2">
-              <Button className="bg-green-600 hover:bg-green-700" onClick={handleApproveCluster}>Approve</Button>
-              <Button variant="destructive" onClick={handleReject}>Reject</Button>
-            </div>
-          )}
-          {loan.status === 'pending_zonal_approval' && (
-            <div className="flex gap-2">
-              <Button className="bg-green-600 hover:bg-green-700" onClick={handleApproveZonal}>Approve</Button>
-              <Button variant="destructive" onClick={handleReject}>Reject</Button>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Approval Trail + Action Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ApprovalTrail loan={loan} />
+        <ApprovalActionPanel loan={loan} onUpdate={load} />
+      </div>
 
       {/* Repayment History */}
       <div className="bg-card rounded-xl border border-border p-5">

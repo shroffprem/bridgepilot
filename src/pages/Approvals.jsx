@@ -18,7 +18,7 @@ function formatINR(n) {
 
 function LoanRow({ loan, onUpdate, navigate }) {
   const [expanded, setExpanded] = useState(false);
-  const requiresZonal = (loan.amount || 0) >= 1000000;
+  const requiresZonal = (loan.principal || 0) >= 1000000;
 
   return (
     <div className="border-b border-border last:border-0">
@@ -33,7 +33,7 @@ function LoanRow({ loan, onUpdate, navigate }) {
             <div className="font-semibold text-sm text-foreground">{loan.borrower_name}</div>
           </div>
           <div className="text-right md:text-left">
-            <div className="font-bold text-sm">{formatINR(loan.amount)}</div>
+            <div className="font-bold text-sm">{formatINR(loan.principal)}</div>
             {requiresZonal && (
               <div className="text-xs text-orange-600 font-medium">Zonal required</div>
             )}

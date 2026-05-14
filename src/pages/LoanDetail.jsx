@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatINR, calcCharges, calcGST, calcOutstanding, calcDays } from '@/lib/mis';
+import ApprovalTrail from '@/components/loans/ApprovalTrail';
 
 function Field({ label, value }) {
   return (
@@ -18,10 +19,21 @@ function Field({ label, value }) {
   );
 }
 
+const STATUS_LABELS = {
+  pending_cluster_approval: 'Pending Cluster Approval',
+  pending_zonal_approval: 'Pending Zonal Approval',
+  open: 'Open',
+  closed: 'Closed',
+  overdue: 'Overdue',
+  rejected: 'Rejected',
+};
 const STATUS_STYLES = {
+  pending_cluster_approval: 'bg-blue-100 text-blue-800',
+  pending_zonal_approval: 'bg-orange-100 text-orange-800',
   open: 'bg-yellow-100 text-yellow-800',
   closed: 'bg-green-100 text-green-800',
   overdue: 'bg-red-100 text-red-800',
+  rejected: 'bg-red-100 text-red-700',
 };
 
 export default function LoanDetail() {
@@ -75,7 +87,7 @@ export default function LoanDetail() {
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="font-syne font-bold text-xl">{loan.borrower_name}</h2>
             <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[loan.status] || 'bg-muted text-muted-foreground'}`}>
-              {loan.status?.toUpperCase()}
+              {STATUS_LABELS[loan.status] || loan.status?.toUpperCase()}
             </span>
           </div>
           <div className="text-sm text-muted-foreground font-mono">{loan.loan_number} {loan.branch && `· ${loan.branch}`} {loan.cluster && `· ${loan.cluster}`}</div>
@@ -175,6 +187,14 @@ export default function LoanDetail() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Approval Trail — visible for pending/rejected loans */}
+      {['pending_cluster_approval', 'pending_zonal_approval', 'rejected'].includes(loan.status) && (
+        <div className="bg-card rounded-xl border border-border p-5">
+          <h3 className="font-syne font-semibold text-sm mb-4">Approval Trail</h3>
+          <ApprovalTrail loan={loan} />
         </div>
       )}
 

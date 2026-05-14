@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserPlus, ShieldCheck, User } from 'lucide-react';
+import LoanCsvImport from '@/components/admin/LoanCsvImport';
 
 const ROLE_LABELS = {
   admin: 'Admin',
@@ -71,6 +72,9 @@ export default function Admin() {
         <h2 className="font-syne font-bold text-xl text-foreground">Admin Panel</h2>
         <p className="text-sm text-muted-foreground mt-1">Manage user access and roles for BridgeLine Partners.</p>
       </div>
+
+      {/* Bulk CSV Import */}
+      <LoanCsvImport />
 
       {/* Invite User */}
       <div className="bg-card rounded-xl border border-border p-6">

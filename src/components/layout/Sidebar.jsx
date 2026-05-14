@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   CheckSquare,
 } from 'lucide-react';
+// Building2 kept for MasterDirectory nav icon
 
 const ALL_NAV = [
   { label: 'Dashboard',       icon: LayoutDashboard, path: '/',          roles: ['admin'] },
@@ -56,12 +57,16 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar flex flex-col z-30">
       <div className="px-6 py-6 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-sidebar-primary flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-white" />
-          </div>
+          <img
+            src="https://media.base44.com/images/public/6a056f02e19305d21d34b219/fa91ede9e_BLPLogo.png"
+            alt="BridgeLine Partners"
+            className="w-10 h-10 object-contain"
+          />
           <div>
-            <div className="font-syne font-bold text-white text-lg leading-none">BridgeLine</div>
-            <div className="text-sidebar-foreground text-xs mt-0.5 opacity-60">Partners MIS</div>
+            <div className="text-white text-base leading-none font-light tracking-wide">
+              <span className="font-bold">BridgeLine</span><span className="font-light">Partners</span>
+            </div>
+            <div className="text-sidebar-foreground text-xs mt-0.5 opacity-60">MIS Portal</div>
           </div>
         </div>
         {user && (

@@ -12,11 +12,15 @@
     },
     "borrower_name": {
       "type": "string",
-      "description": "Denormalized business name for quick display"
+      "description": "Customer name"
+    },
+    "customer_mobile": {
+      "type": "string",
+      "description": "Customer mobile number"
     },
     "amount": {
       "type": "number",
-      "description": "Loan principal in INR"
+      "description": "Amount to be transferred (\u20b9)"
     },
     "interest_rate": {
       "type": "number",
@@ -41,6 +45,67 @@
     },
     "purpose": {
       "type": "string"
+    },
+    "branch": {
+      "type": "string",
+      "description": "Branch name"
+    },
+    "cluster": {
+      "type": "string"
+    },
+    "zone": {
+      "type": "string"
+    },
+    "so_name": {
+      "type": "string",
+      "description": "Sales Officer name"
+    },
+    "value_pledged": {
+      "type": "number",
+      "description": "Value pledged by customer"
+    },
+    "approx_value_offered": {
+      "type": "string",
+      "description": "Approx value offered by us with charges (e.g. Normal BT)"
+    },
+    "net_weight": {
+      "type": "number",
+      "description": "Net weight in grams"
+    },
+    "bank_name": {
+      "type": "string",
+      "description": "Customer bank name"
+    },
+    "account_number": {
+      "type": "string",
+      "description": "Customer bank account number"
+    },
+    "ifsc_code": {
+      "type": "string",
+      "description": "IFSC code"
+    },
+    "aadhar_number": {
+      "type": "string",
+      "description": "Aadhar card number"
+    },
+    "pan_number": {
+      "type": "string",
+      "description": "PAN card number"
+    },
+    "pledge_card_number": {
+      "type": "string",
+      "description": "Pledge card number"
+    },
+    "security_cheque": {
+      "type": "string",
+      "description": "Security cheque details"
+    },
+    "security_details": {
+      "type": "string",
+      "description": "Collateral / security offered"
+    },
+    "processing_fee": {
+      "type": "number"
     },
     "status": {
       "type": "string",
@@ -77,22 +142,6 @@
     },
     "rejection_reason": {
       "type": "string"
-    },
-    "branch": {
-      "type": "string"
-    },
-    "cluster": {
-      "type": "string"
-    },
-    "zone": {
-      "type": "string"
-    },
-    "security_details": {
-      "type": "string",
-      "description": "Collateral / security offered"
-    },
-    "processing_fee": {
-      "type": "number"
     },
     "submitted_by": {
       "type": "string"

@@ -10,10 +10,7 @@ import Dashboard from '@/pages/Dashboard';
 import Loans from '@/pages/Loans';
 import LoanForm from '@/pages/LoanForm';
 import LoanDetail from '@/pages/LoanDetail';
-import Approvals from '@/pages/Approvals';
 import Borrowers from '@/pages/Borrowers';
-import Repayments from '@/pages/Repayments';
-import Collections from '@/pages/Collections';
 import Reports from '@/pages/Reports';
 import MasterDirectory from '@/pages/MasterDirectory';
 
@@ -44,10 +41,7 @@ const AuthenticatedApp = () => {
         <Route path="/loans" element={<Loans />} />
         <Route path="/loans/new" element={<LoanForm />} />
         <Route path="/loans/:id" element={<LoanDetail />} />
-        <Route path="/approvals" element={<Approvals />} />
         <Route path="/borrowers" element={<Borrowers />} />
-        <Route path="/repayments" element={<Repayments />} />
-        <Route path="/collections" element={<Collections />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/directory" element={<MasterDirectory />} />
       </Route>

@@ -1,38 +1,40 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Plus, Search, Filter, FileText } from 'lucide-react';
+import { Plus, Search, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import StatusBadge from '@/components/ui/StatusBadge';
+import { formatINR, calcCharges, calcGST, calcOutstanding } from '@/lib/mis';
 
-function formatINR(n) {
-  if (!n) return '₹0';
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(0)}K`;
-  return `₹${n}`;
-}
-
-const ALL_STATUSES = ['draft', 'pending_cluster_approval', 'pending_zonal_approval', 'approved', 'disbursed', 'repaid', 'overdue', 'rejected'];
+const STATUS_LABELS = { open: 'Open', closed: 'Closed', overdue: 'Overdue' };
+const STATUS_STYLES = {
+  open: 'bg-yellow-100 text-yellow-800',
+  closed: 'bg-green-100 text-green-800',
+  overdue: 'bg-red-100 text-red-800',
+};
 
 export default function Loans() {
   const [loans, setLoans] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [clusterFilter, setClusterFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    base44.entities.Loan.list('-created_date').then(l => { setLoans(l); setLoading(false); });
+    base44.entities.Loan.list('-disbursement_date').then(l => { setLoans(l); setLoading(false); });
   }, []);
 
+  const clusters = [...new Set(loans.map(l => l.cluster).filter(Boolean))].sort();
+  const today = new Date();
+
   const filtered = loans.filter(l => {
-    const matchSearch = l.borrower_name?.toLowerCase().includes(search.toLowerCase()) || l.loan_number?.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || l.borrower_name?.toLowerCase().includes(search.toLowerCase()) || l.loan_number?.toLowerCase().includes(search.toLowerCase()) || l.branch?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || l.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchCluster = clusterFilter === 'all' || l.cluster === clusterFilter;
+    return matchSearch && matchStatus && matchCluster;
   });
 
   return (
@@ -40,17 +42,24 @@ export default function Loans() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-48">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search by borrower or loan #…" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder="Search by customer, loan #, branch…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectTrigger className="w-36"><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            {ALL_STATUSES.map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
+            {Object.entries(STATUS_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={clusterFilter} onValueChange={setClusterFilter}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="All clusters" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Clusters</SelectItem>
+            {clusters.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
         <Button onClick={() => navigate('/loans/new')} className="gap-2 ml-auto">
-          <Plus size={16} /> New Application
+          <Plus size={16} /> New Case
         </Button>
       </div>
 
@@ -61,38 +70,56 @@ export default function Loans() {
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <FileText size={40} className="mb-3 opacity-30" />
-              <p>No loans found</p>
-              <Button onClick={() => navigate('/loans/new')} className="mt-4 gap-2" size="sm"><Plus size={14} /> New Application</Button>
+              <p>No cases found</p>
+              <Button onClick={() => navigate('/loans/new')} className="mt-4 gap-2" size="sm"><Plus size={14} /> New Case</Button>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50 border-b border-border text-xs text-muted-foreground uppercase tracking-wide">
-                  <th className="text-left px-5 py-3 font-medium">Loan #</th>
-                  <th className="text-left px-5 py-3 font-medium">Borrower</th>
-                  <th className="text-right px-5 py-3 font-medium">Amount</th>
-                  <th className="text-right px-5 py-3 font-medium">Interest</th>
-                  <th className="text-left px-5 py-3 font-medium">Maturity</th>
-                  <th className="text-left px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(loan => (
-                  <tr key={loan.id} className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/loans/${loan.id}`)}>
-                    <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">{loan.loan_number || '—'}</td>
-                    <td className="px-5 py-3.5 font-semibold text-foreground">{loan.borrower_name}</td>
-                    <td className="px-5 py-3.5 text-right font-semibold">{formatINR(loan.amount)}</td>
-                    <td className="px-5 py-3.5 text-right text-muted-foreground">{loan.interest_rate}%</td>
-                    <td className="px-5 py-3.5 text-muted-foreground">{loan.maturity_date ? format(new Date(loan.maturity_date), 'dd MMM yyyy') : '—'}</td>
-                    <td className="px-5 py-3.5"><StatusBadge status={loan.status} /></td>
-                    <td className="px-5 py-3.5">
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={e => { e.stopPropagation(); navigate(`/loans/${loan.id}`); }}>View</Button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b border-border text-xs text-muted-foreground uppercase tracking-wide">
+                    <th className="text-left px-4 py-3 font-medium">Date</th>
+                    <th className="text-left px-4 py-3 font-medium">Customer</th>
+                    <th className="text-left px-4 py-3 font-medium">Cluster</th>
+                    <th className="text-left px-4 py-3 font-medium">Branch</th>
+                    <th className="text-right px-4 py-3 font-medium">Principal</th>
+                    <th className="text-right px-4 py-3 font-medium">Charges</th>
+                    <th className="text-right px-4 py-3 font-medium">GST</th>
+                    <th className="text-right px-4 py-3 font-medium">Outstanding</th>
+                    <th className="text-right px-4 py-3 font-medium">Days</th>
+                    <th className="text-right px-4 py-3 font-medium">Rate</th>
+                    <th className="text-center px-4 py-3 font-medium">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filtered.map(l => {
+                    const charges = calcCharges(l);
+                    const gst = l.gst != null ? l.gst : calcGST(charges);
+                    const outstanding = calcOutstanding(l);
+                    const days = l.disbursement_date ? Math.round((today - new Date(l.disbursement_date)) / 86400000) : 0;
+                    return (
+                      <tr key={l.id} className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/loans/${l.id}`)}>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM-yy') : '—'}</td>
+                        <td className="px-4 py-3 font-semibold">{l.borrower_name}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{l.cluster || '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{l.branch || '—'}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{formatINR(l.principal)}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{formatINR(charges)}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{formatINR(gst)}</td>
+                        <td className={`px-4 py-3 text-right font-semibold ${l.status === 'overdue' ? 'text-red-600' : ''}`}>{l.status === 'closed' ? '—' : formatINR(outstanding)}</td>
+                        <td className={`px-4 py-3 text-right text-xs font-mono ${days > 7 ? 'text-red-500' : 'text-muted-foreground'}`}>{l.status === 'closed' ? '✓' : days}</td>
+                        <td className="px-4 py-3 text-right text-xs text-muted-foreground">{l.rate ? `${l.rate}%` : '—'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[l.status] || 'bg-muted text-muted-foreground'}`}>
+                            {STATUS_LABELS[l.status] || l.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

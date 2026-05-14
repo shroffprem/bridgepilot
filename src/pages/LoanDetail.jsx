@@ -2,22 +2,12 @@ import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, CreditCard, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import StatusBadge from '@/components/ui/StatusBadge';
-import ApprovalTrail from '@/components/loans/ApprovalTrail';
-import ApprovalActionPanel from '@/components/loans/ApprovalActionPanel';
-
-function formatINR(n) {
-  if (!n) return '₹0';
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
-  if (n >= 100000) return `₹${(n / 100000).toFixed(2)}L`;
-  return `₹${n?.toLocaleString('en-IN')}`;
-}
+import { formatINR, calcCharges, calcGST, calcOutstanding, calcDays } from '@/lib/mis';
 
 function Field({ label, value }) {
   return (
@@ -28,29 +18,31 @@ function Field({ label, value }) {
   );
 }
 
+const STATUS_STYLES = {
+  open: 'bg-yellow-100 text-yellow-800',
+  closed: 'bg-green-100 text-green-800',
+  overdue: 'bg-red-100 text-red-800',
+};
+
 export default function LoanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loan, setLoan] = useState(null);
-  const [repayments, setRepayments] = useState([]);
-  const [repayForm, setRepayForm] = useState({ amount_received: '', payment_date: format(new Date(), 'yyyy-MM-dd'), payment_mode: 'bank_transfer', reference_number: '', notes: '' });
-  const [repayOpen, setRepayOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closureDate, setClosureDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const load = async () => {
-    const [l, r] = await Promise.all([
-      base44.entities.Loan.filter({ id }),
-      base44.entities.Repayment.filter({ loan_id: id }),
-    ]);
-    setLoan(l[0]);
-    setRepayments(r);
+    const [l] = await base44.entities.Loan.filter({ id });
+    setLoan(l);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, [id]);
 
-  const handleDisburse = async () => {
-    await base44.entities.Loan.update(id, { status: 'disbursed' });
+  const handleClose = async () => {
+    await base44.entities.Loan.update(id, { status: 'closed', closure_date: closureDate, outstanding: 0 });
+    setCloseOpen(false);
     load();
   };
 
@@ -59,140 +51,152 @@ export default function LoanDetail() {
     load();
   };
 
-  const handleRepayment = async () => {
-    const amount = parseFloat(repayForm.amount_received);
-    const interest = ((loan.amount || 0) * (loan.interest_rate || 0) * (loan.tenure_days || 0)) / (100 * 365);
-    await base44.entities.Repayment.create({
-      ...repayForm,
-      loan_id: id,
-      loan_number: loan.loan_number,
-      borrower_name: loan.borrower_name,
-      amount_received: amount,
-      principal_component: loan.amount,
-      interest_component: interest,
-      recorded_by: 'Current User',
-    });
-    await base44.entities.Loan.update(id, { status: 'repaid' });
-    setRepayOpen(false);
+  const handleReopen = async () => {
+    await base44.entities.Loan.update(id, { status: 'open', closure_date: null });
     load();
   };
 
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" /></div>;
-  if (!loan) return <div className="text-muted-foreground py-20 text-center">Loan not found</div>;
+  if (!loan) return <div className="text-muted-foreground py-20 text-center">Case not found</div>;
 
-  const totalRepaid = repayments.reduce((s, r) => s + (r.amount_received || 0), 0);
+  const charges = calcCharges(loan);
+  const gst = loan.gst != null ? loan.gst : calcGST(charges);
+  const outstanding = calcOutstanding(loan);
+  const days = calcDays(loan);
+  const totalBilled = (loan.principal || 0) + charges + gst;
+  const roi = loan.principal > 0 ? ((charges / loan.principal) * 100).toFixed(3) : '0';
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" onClick={() => navigate('/loans')} className="gap-2 text-muted-foreground"><ArrowLeft size={16} /></Button>
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="font-syne font-bold text-xl">{loan.borrower_name}</h2>
-            <StatusBadge status={loan.status} />
+            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[loan.status] || 'bg-muted text-muted-foreground'}`}>
+              {loan.status?.toUpperCase()}
+            </span>
           </div>
-          <div className="text-sm text-muted-foreground font-mono">{loan.loan_number}</div>
+          <div className="text-sm text-muted-foreground font-mono">{loan.loan_number} {loan.branch && `· ${loan.branch}`} {loan.cluster && `· ${loan.cluster}`}</div>
         </div>
         <div className="flex gap-2">
-          {loan.status === 'approved' && (
-            <Button size="sm" className="gap-1" onClick={handleDisburse}>Mark Disbursed</Button>
-          )}
-          {loan.status === 'disbursed' && (
+          {loan.status === 'open' && (
             <>
-              <Button size="sm" className="gap-1" onClick={() => setRepayOpen(true)}><CreditCard size={14} /> Record Repayment</Button>
+              <Button size="sm" className="gap-1" onClick={() => setCloseOpen(true)}><CheckCircle size={14} /> Close Case</Button>
               <Button size="sm" variant="destructive" className="gap-1" onClick={handleMarkOverdue}><AlertTriangle size={14} /> Mark Overdue</Button>
             </>
           )}
           {loan.status === 'overdue' && (
-            <Button size="sm" className="gap-1" onClick={() => setRepayOpen(true)}><CreditCard size={14} /> Record Repayment</Button>
+            <Button size="sm" className="gap-1" onClick={() => setCloseOpen(true)}><CheckCircle size={14} /> Close Case</Button>
+          )}
+          {loan.status === 'closed' && (
+            <Button size="sm" variant="outline" onClick={handleReopen}>Re-open</Button>
           )}
         </div>
       </div>
 
-      {/* Loan Details */}
-      <div className="bg-card rounded-xl border border-border p-5 grid grid-cols-2 md:grid-cols-4 gap-5">
-        <Field label="Principal" value={formatINR(loan.amount)} />
-        <Field label="Interest Rate" value={`${loan.interest_rate}% p.a.`} />
-        <Field label="Tenure" value={`${loan.tenure_days} days`} />
-        <Field label="Total Repayable" value={formatINR(loan.total_repayable)} />
-        <Field label="Disbursement Date" value={loan.disbursement_date} />
-        <Field label="Maturity Date" value={loan.maturity_date} />
-        <Field label="Branch" value={loan.branch} />
-        <Field label="Zone" value={loan.zone} />
-        <Field label="Purpose" value={loan.purpose} />
-        <Field label="Security" value={loan.security_details} />
-        <Field label="Processing Fee" value={formatINR(loan.processing_fee)} />
-        <Field label="Cluster" value={loan.cluster} />
+      {/* Financial Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: 'Principal', value: formatINR(loan.principal), accent: true },
+          { label: 'Charges', value: formatINR(charges) },
+          { label: 'GST', value: formatINR(gst) },
+          { label: 'Total Billed', value: formatINR(totalBilled) },
+          { label: 'Outstanding', value: formatINR(outstanding), highlight: loan.status !== 'closed' },
+          { label: 'Days Open', value: days },
+          { label: 'Rate', value: loan.rate ? `${loan.rate}%` : '—' },
+          { label: 'ROI', value: `${roi}%` },
+        ].map(({ label, value, accent, highlight }) => (
+          <div key={label} className={`bg-card rounded-xl border p-4 ${accent ? 'border-l-4 border-l-primary border-border' : 'border-border'}`}>
+            <div className="text-xs text-muted-foreground mb-1">{label}</div>
+            <div className={`font-syne font-bold text-lg ${highlight ? 'text-red-600' : 'text-foreground'}`}>{value}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Approval Trail + Action Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ApprovalTrail loan={loan} />
-        <ApprovalActionPanel loan={loan} onUpdate={load} />
-      </div>
-
-      {/* Repayment History */}
+      {/* Case Details */}
       <div className="bg-card rounded-xl border border-border p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-syne font-semibold text-sm">Repayment History</h3>
-          <div className="text-sm text-muted-foreground">Total received: <span className="font-semibold text-foreground">{formatINR(totalRepaid)}</span></div>
+        <h3 className="font-syne font-semibold text-sm mb-4">Case Details</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Field label="Disbursement Date" value={loan.disbursement_date ? format(new Date(loan.disbursement_date), 'dd MMM yyyy') : null} />
+          <Field label="Closure Date" value={loan.closure_date ? format(new Date(loan.closure_date), 'dd MMM yyyy') : null} />
+          <Field label="Branch" value={loan.branch} />
+          <Field label="Cluster" value={loan.cluster} />
+          <Field label="Zone" value={loan.zone} />
+          <Field label="SO Name" value={loan.so_name} />
+          <Field label="Customer Mobile" value={loan.customer_mobile} />
+          <Field label="Purpose" value={loan.purpose} />
         </div>
-        {repayments.length === 0 ? (
-          <div className="text-sm text-muted-foreground py-6 text-center">No repayments recorded yet</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground">
-                <th className="text-left py-2 font-medium">Date</th>
-                <th className="text-right py-2 font-medium">Amount</th>
-                <th className="text-left py-2 font-medium">Mode</th>
-                <th className="text-left py-2 font-medium">Reference</th>
-                <th className="text-left py-2 font-medium">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {repayments.map(r => (
-                <tr key={r.id} className="border-b border-border last:border-0">
-                  <td className="py-2.5">{r.payment_date}</td>
-                  <td className="py-2.5 text-right font-semibold text-green-600">{formatINR(r.amount_received)}</td>
-                  <td className="py-2.5 capitalize text-muted-foreground">{r.payment_mode?.replace('_', ' ')}</td>
-                  <td className="py-2.5 font-mono text-xs text-muted-foreground">{r.reference_number || '—'}</td>
-                  <td className="py-2.5 text-muted-foreground">{r.notes || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
 
-      {/* Repayment Dialog */}
-      <Dialog open={repayOpen} onOpenChange={setRepayOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Record Repayment</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div className="bg-muted rounded-lg p-3 text-sm">
-              <span className="text-muted-foreground">Total due: </span>
-              <span className="font-bold text-foreground">{formatINR(loan.total_repayable)}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Amount Received (₹)</Label><Input type="number" value={repayForm.amount_received} onChange={e => setRepayForm(p => ({...p, amount_received: e.target.value}))} /></div>
-              <div className="space-y-1"><Label>Payment Date</Label><Input type="date" value={repayForm.payment_date} onChange={e => setRepayForm(p => ({...p, payment_date: e.target.value}))} /></div>
-              <div className="space-y-1 col-span-2">
-                <Label>Payment Mode</Label>
-                <Select value={repayForm.payment_mode} onValueChange={v => setRepayForm(p => ({...p, payment_mode: v}))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {['bank_transfer', 'cash', 'cheque', 'upi', 'other'].map(m => <SelectItem key={m} value={m}>{m.replace('_', ' ')}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+      {/* Gold / Pledge Details */}
+      {(loan.net_weight || loan.value_pledged || loan.security_details) && (
+        <div className="bg-card rounded-xl border border-border p-5">
+          <h3 className="font-syne font-semibold text-sm mb-4">Pledge / Gold Details</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Field label="Net Weight (g)" value={loan.net_weight} />
+            <Field label="Value Pledged" value={loan.value_pledged ? formatINR(loan.value_pledged) : null} />
+            <Field label="Approx Value Offered" value={loan.approx_value_offered} />
+            <Field label="Security Details" value={loan.security_details} />
+          </div>
+        </div>
+      )}
+
+      {/* Bank Details */}
+      {(loan.bank_name || loan.account_number) && (
+        <div className="bg-card rounded-xl border border-border p-5">
+          <h3 className="font-syne font-semibold text-sm mb-4">Bank Details</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Field label="Bank Name" value={loan.bank_name} />
+            <Field label="Account Number" value={loan.account_number} />
+            <Field label="IFSC Code" value={loan.ifsc_code} />
+          </div>
+        </div>
+      )}
+
+      {/* KYC Documents */}
+      {(loan.aadhar_number || loan.pan_number || loan.aadhar_image_url || loan.pan_image_url) && (
+        <div className="bg-card rounded-xl border border-border p-5">
+          <h3 className="font-syne font-semibold text-sm mb-4">KYC Documents</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Field label="Aadhar Number" value={loan.aadhar_number} />
+            <Field label="PAN Number" value={loan.pan_number} />
+            <Field label="Pledge Card No." value={loan.pledge_card_number} />
+            <Field label="Security Cheque" value={loan.security_cheque} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+            {[['Aadhar', loan.aadhar_image_url], ['PAN', loan.pan_image_url], ['Pledge Card', loan.pledge_card_image_url], ['Security Cheque', loan.security_cheque_image_url]].map(([label, url]) => url && (
+              <div key={label}>
+                <div className="text-xs text-muted-foreground mb-1">{label}</div>
+                <a href={url} target="_blank" rel="noreferrer">
+                  <img src={url} alt={label} className="h-20 w-full object-cover rounded-lg border border-border hover:opacity-80 transition-opacity" />
+                </a>
               </div>
-              <div className="space-y-1 col-span-2"><Label>Reference Number</Label><Input value={repayForm.reference_number} onChange={e => setRepayForm(p => ({...p, reference_number: e.target.value}))} /></div>
-              <div className="space-y-1 col-span-2"><Label>Notes</Label><Input value={repayForm.notes} onChange={e => setRepayForm(p => ({...p, notes: e.target.value}))} /></div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Close Case Dialog */}
+      <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Close Case — {loan.borrower_name}</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
+              <div className="flex justify-between"><span className="text-muted-foreground">Principal</span><span className="font-semibold">{formatINR(loan.principal)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Charges</span><span className="font-semibold">{formatINR(charges)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">GST</span><span className="font-semibold">{formatINR(gst)}</span></div>
+              <div className="flex justify-between font-bold border-t border-border pt-1 mt-1"><span>Total to Collect</span><span>{formatINR(totalBilled)}</span></div>
+            </div>
+            <div className="space-y-1">
+              <Label>Closure Date</Label>
+              <Input type="date" value={closureDate} onChange={e => setClosureDate(e.target.value)} />
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-2">
-            <Button variant="outline" onClick={() => setRepayOpen(false)}>Cancel</Button>
-            <Button onClick={handleRepayment}>Save Repayment</Button>
+            <Button variant="outline" onClick={() => setCloseOpen(false)}>Cancel</Button>
+            <Button onClick={handleClose}>Confirm Closure</Button>
           </div>
         </DialogContent>
       </Dialog>

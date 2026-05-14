@@ -6,14 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Calculator } from 'lucide-react';
 import SmartPasteBox from '@/components/loans/SmartPasteBox';
 import ImageUploadField from '@/components/loans/ImageUploadField';
+import { formatINR, calcGST } from '@/lib/mis';
 
 function Field({ label, required, children }) {
   return (
     <div className="space-y-1">
-      <Label>{label} {required && <span className="text-destructive">*</span>}</Label>
+      <Label>{label}{required && <span className="text-destructive"> *</span>}</Label>
       {children}
     </div>
   );
@@ -30,7 +31,9 @@ function SectionHeader({ title }) {
 const EMPTY_FORM = {
   borrower_name: '',
   customer_mobile: '',
-  amount: '',
+  principal: '',
+  rate: '',
+  charges: '',
   disbursement_date: format(new Date(), 'yyyy-MM-dd'),
   purpose: '',
   branch: '',
@@ -63,20 +66,29 @@ export default function LoanForm() {
   const setVal = (field, value) => setForm(p => ({ ...p, [field]: value }));
   const merge = (obj) => setForm(p => ({ ...p, ...Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== '')) }));
 
-  const handleParsed = (parsed) => merge(parsed);
+  const principal = parseFloat(form.principal) || 0;
+  const rate = parseFloat(form.rate) || 0;
+  // Charges = principal * rate / 100 (fixed at disbursement)
+  const autoCharges = rate > 0 ? principal * rate / 100 : parseFloat(form.charges) || 0;
+  const charges = rate > 0 ? autoCharges : parseFloat(form.charges) || 0;
+  const gst = calcGST(charges);
+  const outstanding = principal + charges + gst;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const loanNumber = `LN-${Date.now().toString().slice(-8)}`;
+    const loanNumber = `BLP-${Date.now().toString().slice(-8)}`;
     await base44.entities.Loan.create({
       ...form,
-      amount: parseFloat(form.amount) || 0,
+      principal,
+      rate: parseFloat(form.rate) || 0,
+      charges,
+      gst,
+      outstanding,
       value_pledged: parseFloat(form.value_pledged) || 0,
       net_weight: parseFloat(form.net_weight) || 0,
       loan_number: loanNumber,
-      status: 'pending_cluster_approval',
-      approval_stage: 'cluster',
+      status: 'open',
     });
     navigate('/loans');
   };
@@ -88,39 +100,37 @@ export default function LoanForm() {
       </Button>
 
       <div className="bg-card rounded-xl border border-border p-6">
-        <h2 className="font-syne font-bold text-lg text-foreground mb-6">New Loan Application</h2>
+        <h2 className="font-syne font-bold text-lg text-foreground mb-6">New Case — BridgeLine Partners</h2>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <SmartPasteBox onParsed={merge} />
 
-          {/* ── Smart Paste ── */}
-          <SmartPasteBox onParsed={handleParsed} />
-
-          {/* ── Customer Details ── */}
+          {/* Customer */}
           <SectionHeader title="Customer Details" />
           <div className="grid grid-cols-2 gap-4">
             <Field label="Customer Name" required>
-              <Input value={form.borrower_name} onChange={set('borrower_name')} placeholder="e.g. Asha" required />
+              <Input value={form.borrower_name} onChange={set('borrower_name')} placeholder="e.g. Pavana Kumara" required />
             </Field>
             <Field label="Mobile No.">
-              <Input value={form.customer_mobile} onChange={set('customer_mobile')} placeholder="e.g. 99016 66190" />
+              <Input value={form.customer_mobile} onChange={set('customer_mobile')} placeholder="e.g. 98451 22023" />
             </Field>
           </div>
 
-          {/* ── Branch & Officer ── */}
+          {/* Branch & Officer */}
           <SectionHeader title="Branch & Officer" />
           <div className="grid grid-cols-3 gap-4">
-            <Field label="Branch Name"><Input value={form.branch} onChange={set('branch')} placeholder="e.g. Shankarpura" /></Field>
-            <Field label="Cluster"><Input value={form.cluster} onChange={set('cluster')} /></Field>
+            <Field label="Branch"><Input value={form.branch} onChange={set('branch')} placeholder="e.g. Vijay Nagar" /></Field>
+            <Field label="Cluster"><Input value={form.cluster} onChange={set('cluster')} placeholder="e.g. Mysore" /></Field>
             <Field label="Zone"><Input value={form.zone} onChange={set('zone')} /></Field>
           </div>
-          <Field label="SO Name (Sales Officer)">
+          <Field label="SO / Handled By">
             <Input value={form.so_name} onChange={set('so_name')} placeholder="e.g. Vanishree" />
           </Field>
 
-          {/* ── Pledge / Gold Details ── */}
+          {/* Pledge */}
           <SectionHeader title="Pledge / Gold Details" />
           <div className="grid grid-cols-3 gap-4">
-            <Field label="Net Weight (grams)"><Input type="number" step="0.01" value={form.net_weight} onChange={set('net_weight')} placeholder="e.g. 129.88" /></Field>
+            <Field label="Net Weight (g)"><Input type="number" step="0.01" value={form.net_weight} onChange={set('net_weight')} placeholder="e.g. 129.88" /></Field>
             <Field label="Value Pledged (₹)"><Input type="number" value={form.value_pledged} onChange={set('value_pledged')} /></Field>
             <Field label="Approx Value Offered"><Input value={form.approx_value_offered} onChange={set('approx_value_offered')} placeholder="e.g. Normal BT" /></Field>
           </div>
@@ -128,94 +138,79 @@ export default function LoanForm() {
             <Textarea value={form.security_details} onChange={set('security_details')} rows={2} />
           </Field>
 
-          {/* ── Loan Amount ── */}
-          <SectionHeader title="Loan Amount" />
+          {/* Loan Terms */}
+          <SectionHeader title="Loan Terms" />
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Amount to be Transferred (₹)" required>
-              <Input type="number" value={form.amount} onChange={set('amount')} placeholder="e.g. 1086800" required />
+            <Field label="Principal (₹)" required>
+              <Input type="number" value={form.principal} onChange={set('principal')} placeholder="e.g. 500000" required />
             </Field>
             <Field label="Disbursement Date">
               <Input type="date" value={form.disbursement_date} onChange={set('disbursement_date')} />
             </Field>
+            <Field label="Charge Rate (% of principal)">
+              <Input type="number" step="0.01" value={form.rate} onChange={set('rate')} placeholder="e.g. 0.50" />
+            </Field>
+            <Field label="Fixed Charges (₹) — if rate not used">
+              <Input type="number" value={form.charges} onChange={set('charges')} placeholder="Auto-calculated from rate" disabled={rate > 0} />
+            </Field>
           </div>
+
+          {principal > 0 && (charges > 0 || rate > 0) && (
+            <div className="bg-accent rounded-xl p-4">
+              <div className="flex items-center gap-2 text-accent-foreground font-semibold text-sm mb-3">
+                <Calculator size={15} /> Case Summary
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Principal</span><span className="font-medium">{formatINR(principal)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Charges</span><span className="font-medium">{formatINR(charges)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">GST (18%)</span><span className="font-medium">{formatINR(gst)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Total Outstanding</span><span className="font-bold text-primary">{formatINR(outstanding)}</span></div>
+              </div>
+            </div>
+          )}
 
           <Field label="Purpose of Loan">
             <Textarea value={form.purpose} onChange={set('purpose')} rows={2} placeholder="Describe the business purpose…" />
           </Field>
 
-          {/* ── Bank Account Details ── */}
+          {/* Bank Account */}
           <SectionHeader title="Bank Account (Transfer To)" />
           <div className="grid grid-cols-2 gap-4">
             <Field label="Bank Name"><Input value={form.bank_name} onChange={set('bank_name')} placeholder="e.g. Canara Bank" /></Field>
-            <Field label="Account Number"><Input value={form.account_number} onChange={set('account_number')} placeholder="e.g. 0636101011367" /></Field>
+            <Field label="Account Number"><Input value={form.account_number} onChange={set('account_number')} /></Field>
             <Field label="IFSC Code"><Input value={form.ifsc_code} onChange={set('ifsc_code')} placeholder="e.g. CNRB0000636" /></Field>
           </div>
 
-          {/* ── KYC & Documents ── */}
+          {/* KYC */}
           <SectionHeader title="KYC & Documents" />
           <p className="text-xs text-muted-foreground -mt-2">Upload document images — details will be extracted automatically.</p>
-
           <div className="grid grid-cols-2 gap-5">
-            {/* Aadhar */}
             <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/30">
-              <ImageUploadField
-                label="Aadhar Card"
-                imageUrl={form.aadhar_image_url}
-                onUpload={(url) => setVal('aadhar_image_url', url)}
-                extractFields={['aadhar_number', 'name']}
-                onExtract={(data) => merge({ aadhar_number: data.aadhar_number })}
-              />
-              <Field label="Aadhar Number">
-                <Input value={form.aadhar_number} onChange={set('aadhar_number')} placeholder="Auto-filled or type manually" />
-              </Field>
+              <ImageUploadField label="Aadhar Card" imageUrl={form.aadhar_image_url} onUpload={url => setVal('aadhar_image_url', url)}
+                extractFields={['aadhar_number', 'name']} onExtract={d => merge({ aadhar_number: d.aadhar_number })} />
+              <Field label="Aadhar Number"><Input value={form.aadhar_number} onChange={set('aadhar_number')} placeholder="Auto-filled or type manually" /></Field>
             </div>
-
-            {/* PAN */}
             <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/30">
-              <ImageUploadField
-                label="PAN Card"
-                imageUrl={form.pan_image_url}
-                onUpload={(url) => setVal('pan_image_url', url)}
-                extractFields={['pan_number', 'name']}
-                onExtract={(data) => merge({ pan_number: data.pan_number })}
-              />
-              <Field label="PAN Number">
-                <Input value={form.pan_number} onChange={set('pan_number')} placeholder="Auto-filled or type manually" />
-              </Field>
+              <ImageUploadField label="PAN Card" imageUrl={form.pan_image_url} onUpload={url => setVal('pan_image_url', url)}
+                extractFields={['pan_number', 'name']} onExtract={d => merge({ pan_number: d.pan_number })} />
+              <Field label="PAN Number"><Input value={form.pan_number} onChange={set('pan_number')} placeholder="Auto-filled or type manually" /></Field>
             </div>
-
-            {/* Pledge Card */}
             <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/30">
-              <ImageUploadField
-                label="Pledge Card"
-                imageUrl={form.pledge_card_image_url}
-                onUpload={(url) => setVal('pledge_card_image_url', url)}
-                extractFields={['pledge_card_number', 'pledge_amount', 'pledge_date']}
-                onExtract={(data) => merge({ pledge_card_number: data.pledge_card_number })}
-              />
-              <Field label="Pledge Card Number">
-                <Input value={form.pledge_card_number} onChange={set('pledge_card_number')} placeholder="Auto-filled or type manually" />
-              </Field>
+              <ImageUploadField label="Pledge Card" imageUrl={form.pledge_card_image_url} onUpload={url => setVal('pledge_card_image_url', url)}
+                extractFields={['pledge_card_number', 'pledge_amount', 'pledge_date']} onExtract={d => merge({ pledge_card_number: d.pledge_card_number })} />
+              <Field label="Pledge Card Number"><Input value={form.pledge_card_number} onChange={set('pledge_card_number')} placeholder="Auto-filled or type manually" /></Field>
             </div>
-
-            {/* Security Cheque */}
             <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/30">
-              <ImageUploadField
-                label="Security Cheque"
-                imageUrl={form.security_cheque_image_url}
-                onUpload={(url) => setVal('security_cheque_image_url', url)}
+              <ImageUploadField label="Security Cheque" imageUrl={form.security_cheque_image_url} onUpload={url => setVal('security_cheque_image_url', url)}
                 extractFields={['cheque_number', 'bank_name', 'amount', 'date', 'account_number']}
-                onExtract={(data) => merge({ security_cheque: [data.cheque_number, data.bank_name, data.date].filter(Boolean).join(' | ') })}
-              />
-              <Field label="Cheque Details">
-                <Input value={form.security_cheque} onChange={set('security_cheque')} placeholder="Auto-filled or type manually" />
-              </Field>
+                onExtract={d => merge({ security_cheque: [d.cheque_number, d.bank_name, d.date].filter(Boolean).join(' | ') })} />
+              <Field label="Cheque Details"><Input value={form.security_cheque} onChange={set('security_cheque')} placeholder="Auto-filled or type manually" /></Field>
             </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => navigate('/loans')}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Submitting…' : 'Submit for Approval'}</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Create Case'}</Button>
           </div>
         </form>
       </div>

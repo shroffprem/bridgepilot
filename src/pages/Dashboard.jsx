@@ -1,263 +1,369 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import StatCard from '@/components/ui/StatCard';
-import StatusBadge from '@/components/ui/StatusBadge';
-import { IndianRupee, AlertTriangle, CheckSquare, CreditCard, MapPin } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/lib/AuthContext';
+import { format, endOfMonth, differenceInDays } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatINR, formatINRFull, calcCharges, calcGST, calcOutstanding, clusterSummary, monthlyBreakdown, calcROI, avgTAT } from '@/lib/mis';
+import { TrendingUp, Briefcase, IndianRupee, AlertCircle, Target, Clock } from 'lucide-react';
 
-const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
+const MONTHLY_TARGET = 340000; // ₹3,40,000
 
-function formatINR(amount) {
-  if (!amount) return '₹0';
-  if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
-  if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
-  if (amount >= 1000) return `₹${(amount / 1000).toFixed(0)}K`;
-  return `₹${amount}`;
-}
-
-// Filter loans based on team member's scope
-function scopeFilter(loans, member) {
-  if (!member) return loans;
-  const role = member.role;
-  if (role === 'zonal_manager' || role === 'managing_partner') return loans;
-  if (role === 'cluster_manager' && member.cluster) {
-    return loans.filter(l => l.cluster === member.cluster || l.branch === member.branch);
-  }
-  if (role === 'branch_manager' && member.branch) {
-    return loans.filter(l => l.branch === member.branch);
-  }
-  return loans;
+function KPI({ label, value, sub, accent }) {
+  return (
+    <div className={`bg-card rounded-xl border border-border p-4 ${accent ? 'border-l-4 border-l-primary' : ''}`}>
+      <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</div>
+      <div className="font-syne font-bold text-xl text-foreground">{value}</div>
+      {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+    </div>
+  );
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const [loans, setLoans] = useState([]);
-  const [borrowers, setBorrowers] = useState([]);
-  const [repayments, setRepayments] = useState([]);
-  const [teamMember, setTeamMember] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      base44.entities.Loan.list(),
-      base44.entities.Borrower.list(),
-      base44.entities.Repayment.list(),
-      base44.entities.TeamMember.list(),
-    ]).then(([l, b, r, team]) => {
-      setLoans(l);
-      setBorrowers(b);
-      // Match logged-in user by email to their TeamMember record
-      const me = user?.phone ? team.find(t => t.phone === user.phone) : null;
-      setTeamMember(me || null);
-      // Filter repayments to match scoped loans
-      const scopedLoanIds = new Set(scopeFilter(l, me).map(x => x.id));
-      setRepayments(r.filter(rep => scopedLoanIds.has(rep.loan_id)));
-      setLoading(false);
-    });
-  }, [user]);
+    base44.entities.Loan.list().then(l => { setLoans(l); setLoading(false); });
+  }, []);
 
-  // Apply scope filter based on the current user's team member record
-  const scopedLoans = scopeFilter(loans, teamMember);
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" /></div>;
 
   const today = new Date();
-  const activeLoans = scopedLoans.filter(l => l.status === 'disbursed');
-  const overdueLoans = scopedLoans.filter(l => l.status === 'overdue');
-  const pendingApprovals = scopedLoans.filter(l => ['pending_cluster_approval', 'pending_zonal_approval'].includes(l.status));
-  const dueSoon = activeLoans.filter(l => {
-    if (!l.maturity_date) return false;
-    const mat = new Date(l.maturity_date);
-    return isAfter(mat, today) && isBefore(mat, addDays(today, 7));
+  const openLoans = loans.filter(l => l.status === 'open' || l.status === 'overdue');
+  const closedLoans = loans.filter(l => l.status === 'closed');
+  const overdueLoans = loans.filter(l => l.status === 'overdue');
+
+  const totalPrincipal = openLoans.reduce((s, l) => s + (l.principal || 0), 0);
+  const totalOutstanding = openLoans.reduce((s, l) => s + calcOutstanding(l), 0);
+
+  // MTD charges (current month disbursements)
+  const currentMonth = format(today, 'MMM yyyy');
+  const mtdLoans = loans.filter(l => {
+    if (!l.disbursement_date) return false;
+    return format(new Date(l.disbursement_date), 'MMM yyyy') === currentMonth;
   });
+  const mtdCharges = mtdLoans.reduce((s, l) => s + calcCharges(l), 0);
 
-  const totalDisbursed = activeLoans.reduce((s, l) => s + (l.amount || 0), 0);
-  const totalOverdue = overdueLoans.reduce((s, l) => s + (l.total_repayable || l.amount || 0), 0);
-  const totalRepaid = repayments.reduce((s, r) => s + (r.amount_received || 0), 0);
+  // Portfolio totals
+  const allTimeVolume = loans.reduce((s, l) => s + (l.principal || 0), 0);
+  const allTimeCharges = loans.reduce((s, l) => s + calcCharges(l), 0);
 
-  // Status distribution for pie chart
-  const statusData = [
-    { name: 'Disbursed', value: scopedLoans.filter(l => l.status === 'disbursed').length },
-    { name: 'Approved', value: scopedLoans.filter(l => l.status === 'approved').length },
-    { name: 'Pending', value: pendingApprovals.length },
-    { name: 'Overdue', value: overdueLoans.length },
-    { name: 'Repaid', value: scopedLoans.filter(l => l.status === 'repaid').length },
-  ].filter(d => d.value > 0);
+  // Capital deployed (approximate = sum of open principals)
+  const capitalDeployed = totalPrincipal;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // Available = assume total invested is a fixed pool; compute as allTimeVolume - totalOutstanding
+  // (user can configure total invested in future; for now show outstanding as deployed)
 
-  const scopeLabel = !teamMember ? null
-    : teamMember.role === 'branch_manager'  ? `Branch: ${teamMember.branch}`
-    : teamMember.role === 'cluster_manager' ? `Cluster: ${teamMember.cluster}`
-    : null;
+  // Monthly goalpost
+  const daysLeftInMonth = differenceInDays(endOfMonth(today), today) + 1;
+  const remaining = Math.max(0, MONTHLY_TARGET - mtdCharges);
+  const pctAchieved = Math.min(100, (mtdCharges / MONTHLY_TARGET) * 100);
+  const dailyChargeNeeded = daysLeftInMonth > 0 ? remaining / daysLeftInMonth : 0;
+
+  // All-time ROI
+  const allTimeROI = allTimeVolume > 0 ? ((allTimeCharges / allTimeVolume) * 100).toFixed(4) : '0';
+
+  // Cluster summary
+  const clusters = clusterSummary(loans);
+
+  // Monthly breakdown for chart
+  const monthly = monthlyBreakdown(loans);
+  const chartData = monthly.map(m => ({
+    month: m.month,
+    Volume: Math.round(m.volume / 100000),
+    Charges: Math.round(m.charges / 1000),
+  }));
+
+  // Open cases table
+  const openCases = openLoans.map(l => {
+    const charges = calcCharges(l);
+    const gst = l.gst != null ? l.gst : calcGST(charges);
+    const outstanding = calcOutstanding(l);
+    const days = l.disbursement_date ? Math.round((today - new Date(l.disbursement_date)) / 86400000) : 0;
+    return { ...l, _charges: charges, _gst: gst, _outstanding: outstanding, _days: days };
+  }).sort((a, b) => a._days - b._days);
 
   return (
     <div className="space-y-6">
-      {/* Scope banner for restricted users */}
-      {scopeLabel && (
-        <div className="flex items-center gap-2 text-xs bg-accent text-accent-foreground px-4 py-2.5 rounded-lg border border-border">
-          <MapPin size={13} /> Showing data for your scope — <span className="font-semibold">{scopeLabel}</span>
-        </div>
-      )}
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Active Portfolio"
-          value={formatINR(totalDisbursed)}
-          subtitle={`${activeLoans.length} active loans`}
-          icon={IndianRupee}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-        />
-        <StatCard
-          title="Overdue Amount"
-          value={formatINR(totalOverdue)}
-          subtitle={`${overdueLoans.length} loans overdue`}
-          icon={AlertTriangle}
-          iconBg="bg-red-50"
-          iconColor="text-red-600"
-        />
-        <StatCard
-          title="Pending Approvals"
-          value={pendingApprovals.length}
-          subtitle="Awaiting action"
-          icon={CheckSquare}
-          iconBg="bg-yellow-50"
-          iconColor="text-yellow-600"
-        />
-        <StatCard
-          title="Total Repaid"
-          value={formatINR(totalRepaid)}
-          subtitle={`${repayments.length} transactions`}
-          icon={CreditCard}
-          iconBg="bg-green-50"
-          iconColor="text-green-600"
-        />
-      </div>
-
-      {/* Charts + Due Soon */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Portfolio Status Pie */}
-        <div className="bg-card rounded-xl border border-border p-5">
-          <h3 className="font-syne font-semibold text-sm text-foreground mb-4">Portfolio Status</h3>
-          {statusData.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart>
-                  <Pie data={statusData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                    {statusData.map((_, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v, n) => [v, n]} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {statusData.map((d, i) => (
-                  <div key={d.name} className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                    <span className="text-xs text-muted-foreground">{d.name} ({d.value})</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">No data yet</div>
-          )}
-        </div>
-
-        {/* Due Soon */}
-        <div className="bg-card rounded-xl border border-border p-5">
-          <h3 className="font-syne font-semibold text-sm text-foreground mb-4">Due in Next 7 Days</h3>
-          {dueSoon.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">No loans due soon</div>
-          ) : (
-            <div className="space-y-2 max-h-52 overflow-y-auto">
-              {dueSoon.map(loan => (
-                <Link key={loan.id} to={`/loans/${loan.id}`} className="flex items-center justify-between p-2.5 rounded-lg bg-muted hover:bg-accent transition-colors">
-                  <div>
-                    <div className="text-sm font-medium text-foreground">{loan.borrower_name}</div>
-                    <div className="text-xs text-muted-foreground">{loan.loan_number}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-foreground">{formatINR(loan.total_repayable)}</div>
-                    <div className="text-xs text-muted-foreground">{loan.maturity_date && format(new Date(loan.maturity_date), 'dd MMM')}</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Pending Approvals */}
-        <div className="bg-card rounded-xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-syne font-semibold text-sm text-foreground">Pending Approvals</h3>
-            <Link to="/approvals">
-              <Button variant="ghost" size="sm" className="text-xs h-7">View All</Button>
-            </Link>
-          </div>
-          {pendingApprovals.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">All clear!</div>
-          ) : (
-            <div className="space-y-2 max-h-52 overflow-y-auto">
-              {pendingApprovals.slice(0, 5).map(loan => (
-                <Link key={loan.id} to={`/approvals`} className="flex items-center justify-between p-2.5 rounded-lg bg-muted hover:bg-accent transition-colors">
-                  <div>
-                    <div className="text-sm font-medium text-foreground">{loan.borrower_name}</div>
-                    <div className="text-xs text-muted-foreground">{formatINR(loan.amount)}</div>
-                  </div>
-                  <StatusBadge status={loan.status} />
-                </Link>
-              ))}
-            </div>
-          )}
+      {/* ── Section 1: Portfolio KPIs ── */}
+      <div>
+        <h2 className="font-syne font-bold text-base text-muted-foreground uppercase tracking-wide mb-3">Portfolio Overview</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KPI label="Open Cases" value={openLoans.length} sub={`${overdueLoans.length} overdue`} />
+          <KPI label="Total Principal" value={formatINR(totalPrincipal)} sub="Open cases" accent />
+          <KPI label="Total Outstanding" value={formatINR(totalOutstanding)} sub="Incl. charges + GST" />
+          <KPI label="Net Charges (MTD)" value={formatINR(mtdCharges)} sub={`${mtdLoans.length} cases this month`} accent />
         </div>
       </div>
 
-      {/* Recent Overdue */}
-      {overdueLoans.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-syne font-semibold text-sm text-foreground flex items-center gap-2">
-              <AlertTriangle size={16} className="text-red-500" /> Overdue Loans
-            </h3>
-            <Link to="/collections">
-              <Button variant="ghost" size="sm" className="text-xs h-7">Manage Collections</Button>
-            </Link>
+      {/* ── Section 2: Monthly Goalpost ── */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Target size={16} className="text-primary" />
+            <h3 className="font-syne font-semibold text-sm">Monthly ROI Goalpost — {format(today, 'MMM yyyy')} <span className="text-muted-foreground font-normal">(Target: 4.00%)</span></h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-muted-foreground text-xs">
-                  <th className="text-left py-2 font-medium">Borrower</th>
-                  <th className="text-left py-2 font-medium">Loan #</th>
-                  <th className="text-right py-2 font-medium">Amount Due</th>
-                  <th className="text-right py-2 font-medium">Maturity Date</th>
+          <span className="text-sm font-semibold text-primary">{pctAchieved.toFixed(1)}% achieved</span>
+        </div>
+        <div className="w-full bg-muted rounded-full h-3 mb-4 overflow-hidden">
+          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pctAchieved}%` }} />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
+          {[
+            { label: 'Capital Deployed', value: formatINR(capitalDeployed) },
+            { label: 'Charges Earned', value: formatINR(mtdCharges) },
+            { label: 'Remaining', value: formatINR(remaining) },
+            { label: 'Days Left', value: daysLeftInMonth },
+            { label: 'Daily Charge Needed', value: formatINR(dailyChargeNeeded) },
+            { label: 'Target', value: formatINR(MONTHLY_TARGET) },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-muted/50 rounded-lg p-3">
+              <div className="text-xs text-muted-foreground mb-1">{label}</div>
+              <div className="font-syne font-bold text-sm text-foreground">{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Section 3: Open Cases Table ── */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h3 className="font-syne font-semibold text-sm">Open Cases — All Clusters</h3>
+          <Link to="/loans" className="text-xs text-primary hover:underline">View All Loans →</Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
+                <th className="text-left px-4 py-2.5 font-medium">#</th>
+                <th className="text-left px-4 py-2.5 font-medium">Date</th>
+                <th className="text-left px-4 py-2.5 font-medium">Customer</th>
+                <th className="text-left px-4 py-2.5 font-medium">Cluster</th>
+                <th className="text-left px-4 py-2.5 font-medium">Branch</th>
+                <th className="text-right px-4 py-2.5 font-medium">Principal</th>
+                <th className="text-right px-4 py-2.5 font-medium">Charges</th>
+                <th className="text-right px-4 py-2.5 font-medium">GST</th>
+                <th className="text-right px-4 py-2.5 font-medium">Outstanding</th>
+                <th className="text-right px-4 py-2.5 font-medium">Days</th>
+                <th className="text-right px-4 py-2.5 font-medium">Rate</th>
+                <th className="text-center px-4 py-2.5 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {openCases.length === 0 ? (
+                <tr><td colSpan={12} className="text-center py-10 text-muted-foreground">No open cases</td></tr>
+              ) : openCases.map((l, i) => (
+                <tr key={l.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => window.location.href=`/loans/${l.id}`}>
+                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM-yyyy') : '—'}</td>
+                  <td className="px-4 py-2.5 font-medium">{l.borrower_name}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{l.cluster || '—'}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{l.branch || '—'}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold">{formatINR(l.principal)}</td>
+                  <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(l._charges)}</td>
+                  <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(l._gst)}</td>
+                  <td className={`px-4 py-2.5 text-right font-semibold ${l.status === 'overdue' ? 'text-red-600' : 'text-foreground'}`}>{formatINR(l._outstanding)}</td>
+                  <td className={`px-4 py-2.5 text-right font-mono text-xs ${l._days > 7 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{l._days}</td>
+                  <td className="px-4 py-2.5 text-right text-muted-foreground text-xs">{l.rate ? `${l.rate}%` : '—'}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Follow Up!</span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {overdueLoans.slice(0, 5).map(loan => (
-                  <tr key={loan.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                    <td className="py-2.5 font-medium">{loan.borrower_name}</td>
-                    <td className="py-2.5 text-muted-foreground">{loan.loan_number}</td>
-                    <td className="py-2.5 text-right text-red-600 font-semibold">{formatINR(loan.total_repayable)}</td>
-                    <td className="py-2.5 text-right text-muted-foreground">{loan.maturity_date && format(new Date(loan.maturity_date), 'dd MMM yyyy')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+            {openCases.length > 0 && (
+              <tfoot>
+                <tr className="bg-muted/60 border-t-2 border-border font-bold text-sm">
+                  <td colSpan={5} className="px-4 py-2.5">TOTAL ({openCases.length} cases)</td>
+                  <td className="px-4 py-2.5 text-right">{formatINR(openCases.reduce((s, l) => s + (l.principal||0), 0))}</td>
+                  <td className="px-4 py-2.5 text-right">{formatINR(openCases.reduce((s, l) => s + l._charges, 0))}</td>
+                  <td className="px-4 py-2.5 text-right">{formatINR(openCases.reduce((s, l) => s + l._gst, 0))}</td>
+                  <td className="px-4 py-2.5 text-right">{formatINR(openCases.reduce((s, l) => s + l._outstanding, 0))}</td>
+                  <td colSpan={3} />
+                </tr>
+              </tfoot>
+            )}
+          </table>
         </div>
-      )}
+      </div>
+
+      {/* ── Section 4: Cluster Summary ── */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="font-syne font-semibold text-sm">Cluster Summary</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
+                <th className="text-left px-4 py-2.5 font-medium">Cluster</th>
+                <th className="text-right px-4 py-2.5 font-medium">Cases</th>
+                <th className="text-right px-4 py-2.5 font-medium">Principal</th>
+                <th className="text-right px-4 py-2.5 font-medium">Charges</th>
+                <th className="text-right px-4 py-2.5 font-medium">GST</th>
+                <th className="text-right px-4 py-2.5 font-medium">Outstanding</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clusters.filter(c => c.cases > 0 && openLoans.some(l => (l.cluster||'Other') === c.cluster)).map(c => {
+                const openInCluster = openLoans.filter(l => (l.cluster||'Other') === c.cluster);
+                const principal = openInCluster.reduce((s,l) => s+(l.principal||0), 0);
+                const charges = openInCluster.reduce((s,l) => s+calcCharges(l), 0);
+                const gst = openInCluster.reduce((s,l) => s+(l.gst!=null?l.gst:calcGST(calcCharges(l))), 0);
+                const outstanding = openInCluster.reduce((s,l) => s+calcOutstanding(l), 0);
+                return (
+                  <tr key={c.cluster} className="border-t border-border hover:bg-muted/30">
+                    <td className="px-4 py-2.5 font-medium">{c.cluster}</td>
+                    <td className="px-4 py-2.5 text-right">{openInCluster.length}</td>
+                    <td className="px-4 py-2.5 text-right">{formatINR(principal)}</td>
+                    <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(charges)}</td>
+                    <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(gst)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-primary">{formatINR(outstanding)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Section 5: Cluster Analytics YTD + Month-wise ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Cluster Analytics YTD */}
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-5 py-4 border-b border-border">
+            <h3 className="font-syne font-semibold text-sm">Cluster Analytics — YTD</h3>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase">
+                <th className="text-left px-4 py-2 font-medium">Cluster</th>
+                <th className="text-right px-4 py-2 font-medium">Cases</th>
+                <th className="text-right px-4 py-2 font-medium">Closed</th>
+                <th className="text-right px-4 py-2 font-medium">Volume</th>
+                <th className="text-right px-4 py-2 font-medium">Charges</th>
+                <th className="text-right px-4 py-2 font-medium">Avg TAT</th>
+                <th className="text-right px-4 py-2 font-medium">ROI%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clusters.map((c, i) => {
+                const tat = avgTAT(c.loans);
+                const roi = calcROI(c.principal, c.charges);
+                return (
+                  <tr key={c.cluster} className="border-t border-border">
+                    <td className="px-4 py-2.5 font-medium">
+                      <span className="text-xs text-muted-foreground mr-2">#{i+1}</span>{c.cluster}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">{c.cases}</td>
+                    <td className="px-4 py-2.5 text-right text-green-600 font-medium">{c.closed}</td>
+                    <td className="px-4 py-2.5 text-right">{formatINR(c.principal)}</td>
+                    <td className="px-4 py-2.5 text-right text-primary font-semibold">{formatINR(c.charges)}</td>
+                    <td className={`px-4 py-2.5 text-right text-xs font-mono ${tat && parseFloat(tat) > 1.5 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{tat ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-right text-xs font-semibold text-primary">{roi.toFixed(3)}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Month-wise Volume chart */}
+        <div className="bg-card rounded-xl border border-border p-5">
+          <h3 className="font-syne font-semibold text-sm mb-4">Monthly Volume (₹L) & Charges (₹K)</h3>
+          {chartData.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data yet</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={chartData} barGap={2}>
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v, n) => [n === 'Volume' ? `₹${v}L` : `₹${v}K`, n]} />
+                <Bar dataKey="Volume" fill="hsl(var(--primary))" radius={[3,3,0,0]} />
+                <Bar dataKey="Charges" fill="hsl(var(--success))" radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* ── Section 6: Portfolio Month-wise table ── */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="font-syne font-semibold text-sm">Portfolio Dashboard — Month-wise</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
+                {['Month','Cases','Volume','Charges','GST','Collected','Outstanding','Closed','Open','Avg TAT','ROI%'].map(h => (
+                  <th key={h} className={`px-3 py-2.5 font-medium ${h === 'Month' ? 'text-left' : 'text-right'}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {monthly.map(m => {
+                const isCurrentMonth = m.month === currentMonth;
+                const tat = m.tats.length ? (m.tats.reduce((s,t) => s+t, 0) / m.tats.length).toFixed(1) : '—';
+                const roi = m.volume > 0 ? ((m.charges / m.volume) * 100).toFixed(3) : '0';
+                return (
+                  <tr key={m.month} className={`border-t border-border ${isCurrentMonth ? 'bg-accent/30 font-semibold' : 'hover:bg-muted/30'}`}>
+                    <td className="px-3 py-2.5">{m.month}</td>
+                    <td className="px-3 py-2.5 text-right">{m.cases}</td>
+                    <td className="px-3 py-2.5 text-right">{formatINR(m.volume)}</td>
+                    <td className="px-3 py-2.5 text-right text-primary">{formatINR(m.charges)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted-foreground">{formatINR(m.gst)}</td>
+                    <td className="px-3 py-2.5 text-right text-green-600">{formatINR(m.collected)}</td>
+                    <td className={`px-3 py-2.5 text-right ${m.outstanding > 0 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{formatINR(m.outstanding)}</td>
+                    <td className="px-3 py-2.5 text-right">{m.closed}</td>
+                    <td className="px-3 py-2.5 text-right">{m.open}</td>
+                    <td className={`px-3 py-2.5 text-right text-xs ${parseFloat(tat) > 1.5 ? 'text-red-600' : 'text-muted-foreground'}`}>{tat}</td>
+                    <td className="px-3 py-2.5 text-right text-xs font-semibold text-primary">{roi}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {monthly.length > 0 && (() => {
+              const tot = monthly.reduce((s, m) => ({
+                cases: s.cases + m.cases, volume: s.volume + m.volume, charges: s.charges + m.charges,
+                gst: s.gst + m.gst, collected: s.collected + m.collected, outstanding: s.outstanding + m.outstanding,
+                closed: s.closed + m.closed, open: s.open + m.open,
+              }), { cases: 0, volume: 0, charges: 0, gst: 0, collected: 0, outstanding: 0, closed: 0, open: 0 });
+              const roi = tot.volume > 0 ? ((tot.charges / tot.volume) * 100).toFixed(3) : '0';
+              return (
+                <tfoot>
+                  <tr className="border-t-2 border-border bg-muted/60 font-bold text-sm">
+                    <td className="px-3 py-2.5">TOTAL</td>
+                    <td className="px-3 py-2.5 text-right">{tot.cases}</td>
+                    <td className="px-3 py-2.5 text-right">{formatINR(tot.volume)}</td>
+                    <td className="px-3 py-2.5 text-right text-primary">{formatINR(tot.charges)}</td>
+                    <td className="px-3 py-2.5 text-right">{formatINR(tot.gst)}</td>
+                    <td className="px-3 py-2.5 text-right text-green-600">{formatINR(tot.collected)}</td>
+                    <td className="px-3 py-2.5 text-right text-red-600">{formatINR(tot.outstanding)}</td>
+                    <td className="px-3 py-2.5 text-right">{tot.closed}</td>
+                    <td className="px-3 py-2.5 text-right">{tot.open}</td>
+                    <td className="px-3 py-2.5 text-right">—</td>
+                    <td className="px-3 py-2.5 text-right text-primary">{roi}%</td>
+                  </tr>
+                </tfoot>
+              );
+            })()}
+          </table>
+        </div>
+      </div>
+
+      {/* ── Section 7: All-time portfolio stats ── */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <h3 className="font-syne font-semibold text-sm mb-4">Portfolio Summary (All Time)</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPI label="Total Disbursed (All Time)" value={formatINR(allTimeVolume)} />
+          <KPI label="Net Charges Earned" value={formatINR(allTimeCharges)} accent />
+          <KPI label="Total Pending Cases" value={openLoans.length} />
+          <KPI label="All-Time ROI" value={`${allTimeROI}%`} accent />
+          <KPI label="Total Overdue Cases" value={overdueLoans.length} />
+          <KPI label="Total Closed Cases" value={closedLoans.length} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,19 +4,16 @@ import { Button } from '@/components/ui/button';
 
 const pageTitles = {
   '/': 'Dashboard',
-  '/loans': 'Loan Applications',
-  '/loans/new': 'New Loan Application',
-  '/approvals': 'Pending Approvals',
-  '/borrowers': 'Borrowers',
-  '/repayments': 'Repayments',
-  '/collections': 'Collections',
+  '/loans': 'Cases',
+  '/loans/new': 'New Case',
   '/reports': 'Reports',
+  '/borrowers': 'Borrowers',
   '/directory': 'Master Directory',
 };
 
 export default function TopBar() {
   const location = useLocation();
-  const title = Object.entries(pageTitles).reverse().find(([path]) => location.pathname.startsWith(path))?.[1] || 'LendOps';
+  const title = Object.entries(pageTitles).reverse().find(([path]) => location.pathname.startsWith(path))?.[1] || 'BridgeLine Partners';
 
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 sticky top-0 z-20">

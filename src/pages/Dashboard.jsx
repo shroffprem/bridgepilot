@@ -5,8 +5,9 @@ import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import StatCard from '@/components/ui/StatCard';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { IndianRupee, FileText, AlertTriangle, CheckSquare, TrendingUp, Clock, Users, CreditCard } from 'lucide-react';
+import { IndianRupee, AlertTriangle, CheckSquare, CreditCard, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/AuthContext';
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
 
@@ -18,10 +19,26 @@ function formatINR(amount) {
   return `₹${amount}`;
 }
 
+// Filter loans based on team member's scope
+function scopeFilter(loans, member) {
+  if (!member) return loans;
+  const role = member.role;
+  if (role === 'zonal_manager' || role === 'managing_partner') return loans;
+  if (role === 'cluster_manager' && member.cluster) {
+    return loans.filter(l => l.cluster === member.cluster || l.branch === member.branch);
+  }
+  if (role === 'branch_manager' && member.branch) {
+    return loans.filter(l => l.branch === member.branch);
+  }
+  return loans;
+}
+
 export default function Dashboard() {
+  const { user } = useAuth();
   const [loans, setLoans] = useState([]);
   const [borrowers, setBorrowers] = useState([]);
   const [repayments, setRepayments] = useState([]);
+  const [teamMember, setTeamMember] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,18 +46,27 @@ export default function Dashboard() {
       base44.entities.Loan.list(),
       base44.entities.Borrower.list(),
       base44.entities.Repayment.list(),
-    ]).then(([l, b, r]) => {
+      base44.entities.TeamMember.list(),
+    ]).then(([l, b, r, team]) => {
       setLoans(l);
       setBorrowers(b);
-      setRepayments(r);
+      // Match logged-in user by email to their TeamMember record
+      const me = user?.email ? team.find(t => t.email?.toLowerCase() === user.email.toLowerCase()) : null;
+      setTeamMember(me || null);
+      // Filter repayments to match scoped loans
+      const scopedLoanIds = new Set(scopeFilter(l, me).map(x => x.id));
+      setRepayments(r.filter(rep => scopedLoanIds.has(rep.loan_id)));
       setLoading(false);
     });
-  }, []);
+  }, [user]);
+
+  // Apply scope filter based on the current user's team member record
+  const scopedLoans = scopeFilter(loans, teamMember);
 
   const today = new Date();
-  const activeLoans = loans.filter(l => l.status === 'disbursed');
-  const overdueLoans = loans.filter(l => l.status === 'overdue');
-  const pendingApprovals = loans.filter(l => ['pending_cluster_approval', 'pending_zonal_approval'].includes(l.status));
+  const activeLoans = scopedLoans.filter(l => l.status === 'disbursed');
+  const overdueLoans = scopedLoans.filter(l => l.status === 'overdue');
+  const pendingApprovals = scopedLoans.filter(l => ['pending_cluster_approval', 'pending_zonal_approval'].includes(l.status));
   const dueSoon = activeLoans.filter(l => {
     if (!l.maturity_date) return false;
     const mat = new Date(l.maturity_date);
@@ -53,11 +79,11 @@ export default function Dashboard() {
 
   // Status distribution for pie chart
   const statusData = [
-    { name: 'Disbursed', value: loans.filter(l => l.status === 'disbursed').length },
-    { name: 'Approved', value: loans.filter(l => l.status === 'approved').length },
+    { name: 'Disbursed', value: scopedLoans.filter(l => l.status === 'disbursed').length },
+    { name: 'Approved', value: scopedLoans.filter(l => l.status === 'approved').length },
     { name: 'Pending', value: pendingApprovals.length },
     { name: 'Overdue', value: overdueLoans.length },
-    { name: 'Repaid', value: loans.filter(l => l.status === 'repaid').length },
+    { name: 'Repaid', value: scopedLoans.filter(l => l.status === 'repaid').length },
   ].filter(d => d.value > 0);
 
   if (loading) {
@@ -68,8 +94,19 @@ export default function Dashboard() {
     );
   }
 
+  const scopeLabel = !teamMember ? null
+    : teamMember.role === 'branch_manager'  ? `Branch: ${teamMember.branch}`
+    : teamMember.role === 'cluster_manager' ? `Cluster: ${teamMember.cluster}`
+    : null;
+
   return (
     <div className="space-y-6">
+      {/* Scope banner for restricted users */}
+      {scopeLabel && (
+        <div className="flex items-center gap-2 text-xs bg-accent text-accent-foreground px-4 py-2.5 rounded-lg border border-border">
+          <MapPin size={13} /> Showing data for your scope — <span className="font-semibold">{scopeLabel}</span>
+        </div>
+      )}
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard

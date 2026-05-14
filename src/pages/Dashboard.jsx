@@ -51,7 +51,7 @@ export default function Dashboard() {
       setLoans(l);
       setBorrowers(b);
       // Match logged-in user by email to their TeamMember record
-      const me = user?.email ? team.find(t => t.email?.toLowerCase() === user.email.toLowerCase()) : null;
+      const me = user?.phone ? team.find(t => t.phone === user.phone) : null;
       setTeamMember(me || null);
       // Filter repayments to match scoped loans
       const scopedLoanIds = new Set(scopeFilter(l, me).map(x => x.id));

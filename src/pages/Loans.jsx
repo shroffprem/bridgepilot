@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatINR, calcCharges, calcGST, calcOutstanding } from '@/lib/mis';
 
-const STATUS_LABELS = { open: 'Open', closed: 'Closed', overdue: 'Overdue' };
+const STATUS_LABELS = { pending_approval: 'Pending Approval', open: 'Open', closed: 'Closed', overdue: 'Overdue' };
 const STATUS_STYLES = {
+  pending_approval: 'bg-blue-100 text-blue-800',
   open: 'bg-yellow-100 text-yellow-800',
   closed: 'bg-green-100 text-green-800',
   overdue: 'bg-red-100 text-red-800',
@@ -48,7 +49,10 @@ export default function Loans() {
           <SelectTrigger className="w-36"><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            {Object.entries(STATUS_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+            <SelectItem value="pending_approval">Pending Approval</SelectItem>
+            <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="closed">Closed</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
           </SelectContent>
         </Select>
         <Select value={clusterFilter} onValueChange={setClusterFilter}>

@@ -29,7 +29,7 @@ export default function Dashboard() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" /></div>;
 
   const today = new Date();
-  const openLoans = loans.filter(l => l.status === 'open' || l.status === 'overdue');
+  const openLoans = loans.filter(l => l.status === 'open' || l.status === 'overdue' || l.status === 'pending_approval');
   const closedLoans = loans.filter(l => l.status === 'closed');
   const overdueLoans = loans.filter(l => l.status === 'overdue');
 

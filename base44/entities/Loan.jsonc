@@ -4,34 +4,13 @@
   "properties": {
     "loan_number": {
       "type": "string",
-      "description": "Unique loan reference number"
-    },
-    "borrower_id": {
-      "type": "string",
-      "description": "Reference to Borrower entity"
+      "description": "Unique case reference number"
     },
     "borrower_name": {
       "type": "string",
       "description": "Customer name"
     },
     "customer_mobile": {
-      "type": "string",
-      "description": "Customer mobile number"
-    },
-    "amount": {
-      "type": "number",
-      "description": "Amount to be transferred (\u20b9)"
-    },
-    "disbursement_date": {
-      "type": "string",
-      "format": "date"
-    },
-    "maturity_date": {
-      "type": "string",
-      "format": "date",
-      "description": "Due date"
-    },
-    "purpose": {
       "type": "string"
     },
     "branch": {
@@ -39,88 +18,105 @@
       "description": "Branch name"
     },
     "cluster": {
-      "type": "string"
+      "type": "string",
+      "description": "Cluster (e.g. Mysore, Mangalore, Hassan)"
     },
     "zone": {
       "type": "string"
     },
     "so_name": {
       "type": "string",
-      "description": "Sales Officer name"
+      "description": "Sales Officer / handled by"
     },
-    "value_pledged": {
+    "principal": {
       "type": "number",
-      "description": "Value pledged by customer"
+      "description": "Principal disbursed (\u20b9)"
     },
-    "approx_value_offered": {
+    "rate": {
+      "type": "number",
+      "description": "Monthly charge rate %"
+    },
+    "charges": {
+      "type": "number",
+      "description": "Fixed charges at disbursement (\u20b9)"
+    },
+    "gst": {
+      "type": "number",
+      "description": "GST on charges (\u20b9)"
+    },
+    "outstanding": {
+      "type": "number",
+      "description": "Current outstanding amount (\u20b9)"
+    },
+    "disbursement_date": {
       "type": "string",
-      "description": "Approx value offered by us with charges"
+      "format": "date"
+    },
+    "closure_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date case was closed/collected"
+    },
+    "purpose": {
+      "type": "string"
     },
     "net_weight": {
       "type": "number",
-      "description": "Net weight in grams"
+      "description": "Gold net weight (grams)"
+    },
+    "value_pledged": {
+      "type": "number",
+      "description": "Value of pledged gold (\u20b9)"
+    },
+    "approx_value_offered": {
+      "type": "string"
     },
     "bank_name": {
-      "type": "string",
-      "description": "Customer bank name"
+      "type": "string"
     },
     "account_number": {
-      "type": "string",
-      "description": "Customer bank account number"
+      "type": "string"
     },
     "ifsc_code": {
-      "type": "string",
-      "description": "IFSC code"
+      "type": "string"
     },
     "aadhar_number": {
-      "type": "string",
-      "description": "Aadhar card number"
+      "type": "string"
     },
     "aadhar_image_url": {
-      "type": "string",
-      "description": "Uploaded Aadhar image URL"
+      "type": "string"
     },
     "pan_number": {
-      "type": "string",
-      "description": "PAN card number"
+      "type": "string"
     },
     "pan_image_url": {
-      "type": "string",
-      "description": "Uploaded PAN image URL"
+      "type": "string"
     },
     "pledge_card_number": {
-      "type": "string",
-      "description": "Pledge card number"
+      "type": "string"
     },
     "pledge_card_image_url": {
-      "type": "string",
-      "description": "Uploaded Pledge Card image URL"
+      "type": "string"
     },
     "security_cheque": {
-      "type": "string",
-      "description": "Security cheque details"
+      "type": "string"
     },
     "security_cheque_image_url": {
-      "type": "string",
-      "description": "Uploaded Security Cheque image URL"
+      "type": "string"
     },
     "security_details": {
-      "type": "string",
-      "description": "Collateral / security offered"
+      "type": "string"
     },
     "status": {
       "type": "string",
       "enum": [
-        "draft",
-        "pending_cluster_approval",
-        "pending_zonal_approval",
-        "approved",
-        "disbursed",
-        "repaid",
-        "overdue",
-        "rejected"
+        "pending_approval",
+        "open",
+        "closed",
+        "overdue"
       ],
-      "default": "draft"
+      "default": "pending_approval",
+      "description": "pending_approval = submitted, awaiting manager review; open = active/disbursed; closed = fully collected; overdue = past due"
     },
     "approval_stage": {
       "type": "string",
@@ -131,9 +127,6 @@
         "complete"
       ],
       "default": "branch"
-    },
-    "branch_manager": {
-      "type": "string"
     },
     "cluster_manager_notes": {
       "type": "string"
@@ -156,6 +149,6 @@
   },
   "required": [
     "borrower_name",
-    "amount"
+    "principal"
   ]
 }

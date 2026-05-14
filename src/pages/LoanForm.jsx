@@ -88,7 +88,7 @@ export default function LoanForm() {
       value_pledged: parseFloat(form.value_pledged) || 0,
       net_weight: parseFloat(form.net_weight) || 0,
       loan_number: loanNumber,
-      status: 'open',
+      status: 'pending_approval',
     });
     navigate('/loans');
   };

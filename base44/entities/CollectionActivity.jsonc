@@ -1,0 +1,56 @@
+{
+  "name": "CollectionActivity",
+  "type": "object",
+  "properties": {
+    "loan_id": {
+      "type": "string"
+    },
+    "loan_number": {
+      "type": "string"
+    },
+    "borrower_name": {
+      "type": "string"
+    },
+    "activity_type": {
+      "type": "string",
+      "enum": [
+        "call",
+        "visit",
+        "notice_sent",
+        "legal_notice",
+        "payment_promise",
+        "payment_received",
+        "note"
+      ]
+    },
+    "activity_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "outcome": {
+      "type": "string"
+    },
+    "next_action_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "promise_amount": {
+      "type": "number"
+    },
+    "promise_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "handled_by": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "loan_id",
+    "activity_type",
+    "activity_date"
+  ]
+}

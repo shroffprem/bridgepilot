@@ -1,0 +1,113 @@
+{
+  "name": "Loan",
+  "type": "object",
+  "properties": {
+    "loan_number": {
+      "type": "string",
+      "description": "Unique loan reference number"
+    },
+    "borrower_id": {
+      "type": "string",
+      "description": "Reference to Borrower entity"
+    },
+    "borrower_name": {
+      "type": "string",
+      "description": "Denormalized business name for quick display"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Loan principal in INR"
+    },
+    "interest_rate": {
+      "type": "number",
+      "description": "Annual interest rate in %"
+    },
+    "tenure_days": {
+      "type": "number",
+      "description": "Loan duration in days"
+    },
+    "disbursement_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "maturity_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Due date for bullet repayment"
+    },
+    "total_repayable": {
+      "type": "number",
+      "description": "Principal + interest at maturity"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending_cluster_approval",
+        "pending_zonal_approval",
+        "approved",
+        "disbursed",
+        "repaid",
+        "overdue",
+        "rejected"
+      ],
+      "default": "draft"
+    },
+    "approval_stage": {
+      "type": "string",
+      "enum": [
+        "branch",
+        "cluster",
+        "zonal",
+        "complete"
+      ],
+      "default": "branch"
+    },
+    "branch_manager": {
+      "type": "string"
+    },
+    "cluster_manager_notes": {
+      "type": "string"
+    },
+    "zonal_manager_notes": {
+      "type": "string"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "cluster": {
+      "type": "string"
+    },
+    "zone": {
+      "type": "string"
+    },
+    "security_details": {
+      "type": "string",
+      "description": "Collateral / security offered"
+    },
+    "processing_fee": {
+      "type": "number"
+    },
+    "submitted_by": {
+      "type": "string"
+    },
+    "approved_by_cluster": {
+      "type": "string"
+    },
+    "approved_by_zonal": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "borrower_name",
+    "amount",
+    "interest_rate",
+    "tenure_days"
+  ]
+}

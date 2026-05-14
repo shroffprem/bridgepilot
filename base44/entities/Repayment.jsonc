@@ -1,0 +1,56 @@
+{
+  "name": "Repayment",
+  "type": "object",
+  "properties": {
+    "loan_id": {
+      "type": "string"
+    },
+    "loan_number": {
+      "type": "string"
+    },
+    "borrower_name": {
+      "type": "string"
+    },
+    "amount_received": {
+      "type": "number"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "payment_mode": {
+      "type": "string",
+      "enum": [
+        "bank_transfer",
+        "cash",
+        "cheque",
+        "upi",
+        "other"
+      ]
+    },
+    "reference_number": {
+      "type": "string"
+    },
+    "principal_component": {
+      "type": "number"
+    },
+    "interest_component": {
+      "type": "number"
+    },
+    "penalty_component": {
+      "type": "number"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "recorded_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "loan_id",
+    "amount_received",
+    "payment_date",
+    "payment_mode"
+  ]
+}

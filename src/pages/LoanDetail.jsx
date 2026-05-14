@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Banknote, BadgeCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatINR, calcCharges, calcGST, calcOutstanding, calcDays } from '@/lib/mis';
 import ApprovalTrail from '@/components/loans/ApprovalTrail';
+import DisbursalDialog from '@/components/loans/DisbursalDialog';
+import CollectionDialog from '@/components/loans/CollectionDialog';
 
 function Field({ label, value }) {
   return (
@@ -43,6 +45,8 @@ export default function LoanDetail() {
   const [loading, setLoading] = useState(true);
   const [closeOpen, setCloseOpen] = useState(false);
   const [closureDate, setClosureDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [disbursalOpen, setDisbursalOpen] = useState(false);
+  const [collectionOpen, setCollectionOpen] = useState(false);
 
   const load = async () => {
     const [l] = await base44.entities.Loan.filter({ id });
@@ -90,17 +94,23 @@ export default function LoanDetail() {
               {STATUS_LABELS[loan.status] || loan.status?.toUpperCase()}
             </span>
           </div>
-          <div className="text-sm text-muted-foreground font-mono">{loan.loan_number} {loan.branch && `· ${loan.branch}`} {loan.cluster && `· ${loan.cluster}`}</div>
+          <div className="text-sm text-muted-foreground font-mono">{loan.loan_number} {loan.disbursal_id && `· ${loan.disbursal_id}`} {loan.branch && `· ${loan.branch}`} {loan.cluster && `· ${loan.cluster}`}</div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* Disbursal recording — available once approved (open/overdue) */}
+          {['open', 'overdue'].includes(loan.status) && (
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setDisbursalOpen(true)}>
+              <Banknote size={14} /> Debit Note
+            </Button>
+          )}
           {loan.status === 'open' && (
             <>
-              <Button size="sm" className="gap-1" onClick={() => setCloseOpen(true)}><CheckCircle size={14} /> Close Case</Button>
+              <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCollectionOpen(true)}><BadgeCheck size={14} /> Credit Note</Button>
               <Button size="sm" variant="destructive" className="gap-1" onClick={handleMarkOverdue}><AlertTriangle size={14} /> Mark Overdue</Button>
             </>
           )}
           {loan.status === 'overdue' && (
-            <Button size="sm" className="gap-1" onClick={() => setCloseOpen(true)}><CheckCircle size={14} /> Close Case</Button>
+            <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCollectionOpen(true)}><BadgeCheck size={14} /> Credit Note</Button>
           )}
           {loan.status === 'closed' && (
             <Button size="sm" variant="outline" onClick={handleReopen}>Re-open</Button>
@@ -197,6 +207,9 @@ export default function LoanDetail() {
           <ApprovalTrail loan={loan} />
         </div>
       )}
+
+      <DisbursalDialog loan={loan} open={disbursalOpen} onOpenChange={setDisbursalOpen} onSaved={load} />
+      <CollectionDialog loan={loan} open={collectionOpen} onOpenChange={setCollectionOpen} onSaved={load} />
 
       {/* Close Case Dialog */}
       <Dialog open={closeOpen} onOpenChange={setCloseOpen}>

@@ -1,0 +1,71 @@
+{
+  "name": "Disbursal",
+  "type": "object",
+  "properties": {
+    "disbursal_id": {
+      "type": "string",
+      "description": "Auto-generated disbursal reference ID (e.g. DIS-20240101-XXXX)"
+    },
+    "loan_id": {
+      "type": "string"
+    },
+    "loan_number": {
+      "type": "string"
+    },
+    "borrower_name": {
+      "type": "string"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "cluster": {
+      "type": "string"
+    },
+    "principal": {
+      "type": "number",
+      "description": "Amount disbursed (\u20b9)"
+    },
+    "debit_note_number": {
+      "type": "string",
+      "description": "Bank debit note / UTR / reference number"
+    },
+    "debit_note_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "bank_name": {
+      "type": "string"
+    },
+    "account_number": {
+      "type": "string"
+    },
+    "payment_mode": {
+      "type": "string",
+      "enum": [
+        "bank_transfer",
+        "neft",
+        "rtgs",
+        "imps",
+        "cash",
+        "cheque",
+        "other"
+      ],
+      "default": "bank_transfer"
+    },
+    "debit_note_image_url": {
+      "type": "string",
+      "description": "Upload of bank debit note scan/screenshot"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "recorded_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "loan_id",
+    "principal",
+    "debit_note_date"
+  ]
+}

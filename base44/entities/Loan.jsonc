@@ -6,6 +6,10 @@
       "type": "string",
       "description": "Unique case reference number"
     },
+    "disbursal_id": {
+      "type": "string",
+      "description": "Auto-generated disbursal ID (e.g. DIS-20240101-XXXX)"
+    },
     "borrower_name": {
       "type": "string",
       "description": "Customer name"

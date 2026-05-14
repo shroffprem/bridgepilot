@@ -1,0 +1,83 @@
+{
+  "name": "Collection",
+  "type": "object",
+  "properties": {
+    "loan_id": {
+      "type": "string"
+    },
+    "loan_number": {
+      "type": "string"
+    },
+    "borrower_name": {
+      "type": "string"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "cluster": {
+      "type": "string"
+    },
+    "amount_collected": {
+      "type": "number",
+      "description": "Total amount received (\u20b9)"
+    },
+    "principal_component": {
+      "type": "number"
+    },
+    "charges_component": {
+      "type": "number"
+    },
+    "gst_component": {
+      "type": "number"
+    },
+    "credit_note_number": {
+      "type": "string",
+      "description": "Bank credit note / UTR / reference number"
+    },
+    "credit_note_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "bank_name": {
+      "type": "string"
+    },
+    "payment_mode": {
+      "type": "string",
+      "enum": [
+        "bank_transfer",
+        "neft",
+        "rtgs",
+        "imps",
+        "cash",
+        "cheque",
+        "upi",
+        "other"
+      ],
+      "default": "bank_transfer"
+    },
+    "credit_note_image_url": {
+      "type": "string",
+      "description": "Upload of bank credit note scan/screenshot"
+    },
+    "close_loan": {
+      "type": "boolean",
+      "default": false,
+      "description": "Mark the loan as closed after this collection"
+    },
+    "closure_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "recorded_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "loan_id",
+    "amount_collected",
+    "credit_note_date"
+  ]
+}

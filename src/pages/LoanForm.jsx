@@ -90,7 +90,9 @@ export default function LoanForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const loanNumber = `BLP-${Date.now().toString().slice(-8)}`;
+    const ts = Date.now().toString().slice(-8);
+    const loanNumber = `BLP-${ts}`;
+    const disbursalId = `DIS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${ts}`;
     await base44.entities.Loan.create({
       ...form,
       principal,
@@ -101,6 +103,7 @@ export default function LoanForm() {
       value_pledged: parseFloat(form.value_pledged) || 0,
       net_weight: parseFloat(form.net_weight) || 0,
       loan_number: loanNumber,
+      disbursal_id: disbursalId,
       status: 'pending_cluster_approval',
       submitted_by: (await base44.auth.me())?.full_name || '',
     });

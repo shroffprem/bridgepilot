@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Calculator } from 'lucide-react';
+import SmartPasteBox from '@/components/loans/SmartPasteBox';
+import ImageUploadField from '@/components/loans/ImageUploadField';
 
 function formatINR(n) {
   if (!n) return '₹0';
@@ -33,55 +34,56 @@ function SectionHeader({ title }) {
   );
 }
 
+const EMPTY_FORM = {
+  borrower_name: '',
+  customer_mobile: '',
+  amount: '',
+  interest_rate: '',
+  tenure_days: '',
+  disbursement_date: format(new Date(), 'yyyy-MM-dd'),
+  purpose: '',
+  branch: '',
+  cluster: '',
+  zone: '',
+  so_name: '',
+  value_pledged: '',
+  approx_value_offered: '',
+  net_weight: '',
+  bank_name: '',
+  account_number: '',
+  ifsc_code: '',
+  aadhar_number: '',
+  aadhar_image_url: '',
+  pan_number: '',
+  pan_image_url: '',
+  pledge_card_number: '',
+  pledge_card_image_url: '',
+  security_cheque: '',
+  security_cheque_image_url: '',
+  security_details: '',
+  processing_fee: '',
+};
+
 export default function LoanForm() {
   const navigate = useNavigate();
-  const [borrowers, setBorrowers] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    borrower_id: '',
-    borrower_name: '',
-    customer_mobile: '',
-    amount: '',
-    interest_rate: '',
-    tenure_days: '',
-    disbursement_date: format(new Date(), 'yyyy-MM-dd'),
-    purpose: '',
-    branch: '',
-    cluster: '',
-    zone: '',
-    so_name: '',
-    value_pledged: '',
-    approx_value_offered: '',
-    net_weight: '',
-    bank_name: '',
-    account_number: '',
-    ifsc_code: '',
-    aadhar_number: '',
-    pan_number: '',
-    pledge_card_number: '',
-    security_cheque: '',
-    security_details: '',
-    processing_fee: '',
-  });
-
-  useEffect(() => {
-    base44.entities.Borrower.list().then(setBorrowers);
-  }, []);
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
+  const setVal = (field, value) => setForm(p => ({ ...p, [field]: value }));
+
+  const handleParsed = (parsed) => {
+    setForm(p => ({ ...p, ...Object.fromEntries(Object.entries(parsed).filter(([, v]) => v !== '')) }));
+  };
 
   const amount = parseFloat(form.amount) || 0;
   const rate = parseFloat(form.interest_rate) || 0;
   const days = parseInt(form.tenure_days) || 0;
   const interest = (amount * rate * days) / (100 * 365);
   const totalRepayable = amount + interest;
-  const maturityDate = form.disbursement_date && days ? format(addDays(new Date(form.disbursement_date), days), 'yyyy-MM-dd') : '';
+  const maturityDate = form.disbursement_date && days
+    ? format(addDays(new Date(form.disbursement_date), days), 'yyyy-MM-dd') : '';
   const requiresZonal = amount >= 1000000;
-
-  const handleBorrowerChange = (id) => {
-    const b = borrowers.find(x => x.id === id);
-    setForm(p => ({ ...p, borrower_id: id, borrower_name: b?.business_name || '', customer_mobile: b?.phone || '' }));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -115,16 +117,14 @@ export default function LoanForm() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
+          {/* ── Smart Paste ── */}
+          <SmartPasteBox onParsed={handleParsed} />
+
           {/* ── Customer Details ── */}
           <SectionHeader title="Customer Details" />
           <div className="grid grid-cols-2 gap-4">
             <Field label="Customer Name" required>
-              <Select value={form.borrower_id} onValueChange={handleBorrowerChange} required>
-                <SelectTrigger><SelectValue placeholder="Select borrower" /></SelectTrigger>
-                <SelectContent>
-                  {borrowers.map(b => <SelectItem key={b.id} value={b.id}>{b.business_name} – {b.owner_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Input value={form.borrower_name} onChange={set('borrower_name')} placeholder="e.g. Asha" required />
             </Field>
             <Field label="Mobile No.">
               <Input value={form.customer_mobile} onChange={set('customer_mobile')} placeholder="e.g. 99016 66190" />
@@ -148,12 +148,11 @@ export default function LoanForm() {
           <div className="grid grid-cols-3 gap-4">
             <Field label="Net Weight (grams)"><Input type="number" step="0.01" value={form.net_weight} onChange={set('net_weight')} placeholder="e.g. 129.88" /></Field>
             <Field label="Value Pledged (₹)"><Input type="number" value={form.value_pledged} onChange={set('value_pledged')} /></Field>
-            <Field label="Approx Value Offered (with charges)"><Input value={form.approx_value_offered} onChange={set('approx_value_offered')} placeholder="e.g. Normal BT" /></Field>
+            <Field label="Approx Value Offered"><Input value={form.approx_value_offered} onChange={set('approx_value_offered')} placeholder="e.g. Normal BT" /></Field>
           </div>
-          <div className="space-y-1">
-            <Label>Security / Collateral Details</Label>
+          <Field label="Security / Collateral Details">
             <Textarea value={form.security_details} onChange={set('security_details')} rows={2} />
-          </div>
+          </Field>
 
           {/* ── Loan Terms ── */}
           <SectionHeader title="Loan Terms" />
@@ -172,7 +171,6 @@ export default function LoanForm() {
             </Field>
           </div>
 
-          {/* Loan Summary */}
           {amount > 0 && rate > 0 && days > 0 && (
             <div className="bg-accent rounded-xl p-4 space-y-2">
               <div className="flex items-center gap-2 text-accent-foreground font-semibold text-sm mb-3">
@@ -192,10 +190,9 @@ export default function LoanForm() {
             </div>
           )}
 
-          <div className="space-y-1">
-            <Label>Purpose of Loan</Label>
+          <Field label="Purpose of Loan">
             <Textarea value={form.purpose} onChange={set('purpose')} rows={2} placeholder="Describe the business purpose…" />
-          </div>
+          </Field>
 
           {/* ── Bank Account Details ── */}
           <SectionHeader title="Bank Account (Transfer To)" />
@@ -208,10 +205,46 @@ export default function LoanForm() {
           {/* ── KYC & Documents ── */}
           <SectionHeader title="KYC & Documents" />
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Aadhar Number"><Input value={form.aadhar_number} onChange={set('aadhar_number')} placeholder="XXXX XXXX XXXX" /></Field>
-            <Field label="PAN Number"><Input value={form.pan_number} onChange={set('pan_number')} placeholder="ABCDE1234F" /></Field>
-            <Field label="Pledge Card Number"><Input value={form.pledge_card_number} onChange={set('pledge_card_number')} /></Field>
-            <Field label="Security Cheque Details"><Input value={form.security_cheque} onChange={set('security_cheque')} placeholder="Cheque no., bank, date…" /></Field>
+            <div className="space-y-3">
+              <Field label="Aadhar Number">
+                <Input value={form.aadhar_number} onChange={set('aadhar_number')} placeholder="XXXX XXXX XXXX" />
+              </Field>
+              <ImageUploadField
+                label="Aadhar Image"
+                imageUrl={form.aadhar_image_url}
+                onUpload={(url) => setVal('aadhar_image_url', url)}
+              />
+            </div>
+            <div className="space-y-3">
+              <Field label="PAN Number">
+                <Input value={form.pan_number} onChange={set('pan_number')} placeholder="ABCDE1234F" />
+              </Field>
+              <ImageUploadField
+                label="PAN Image"
+                imageUrl={form.pan_image_url}
+                onUpload={(url) => setVal('pan_image_url', url)}
+              />
+            </div>
+            <div className="space-y-3">
+              <Field label="Pledge Card Number">
+                <Input value={form.pledge_card_number} onChange={set('pledge_card_number')} />
+              </Field>
+              <ImageUploadField
+                label="Pledge Card Image"
+                imageUrl={form.pledge_card_image_url}
+                onUpload={(url) => setVal('pledge_card_image_url', url)}
+              />
+            </div>
+            <div className="space-y-3">
+              <Field label="Security Cheque Details">
+                <Input value={form.security_cheque} onChange={set('security_cheque')} placeholder="Cheque no., bank, date…" />
+              </Field>
+              <ImageUploadField
+                label="Security Cheque Image"
+                imageUrl={form.security_cheque_image_url}
+                onUpload={(url) => setVal('security_cheque_image_url', url)}
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

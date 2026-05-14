@@ -66,7 +66,7 @@
     },
     "approx_value_offered": {
       "type": "string",
-      "description": "Approx value offered by us with charges (e.g. Normal BT)"
+      "description": "Approx value offered by us with charges"
     },
     "net_weight": {
       "type": "number",
@@ -88,17 +88,33 @@
       "type": "string",
       "description": "Aadhar card number"
     },
+    "aadhar_image_url": {
+      "type": "string",
+      "description": "Uploaded Aadhar image URL"
+    },
     "pan_number": {
       "type": "string",
       "description": "PAN card number"
+    },
+    "pan_image_url": {
+      "type": "string",
+      "description": "Uploaded PAN image URL"
     },
     "pledge_card_number": {
       "type": "string",
       "description": "Pledge card number"
     },
+    "pledge_card_image_url": {
+      "type": "string",
+      "description": "Uploaded Pledge Card image URL"
+    },
     "security_cheque": {
       "type": "string",
       "description": "Security cheque details"
+    },
+    "security_cheque_image_url": {
+      "type": "string",
+      "description": "Uploaded Security Cheque image URL"
     },
     "security_details": {
       "type": "string",

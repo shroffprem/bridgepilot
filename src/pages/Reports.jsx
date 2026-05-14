@@ -60,7 +60,7 @@ export default function Reports() {
     Promise.all([
       base44.entities.Loan.list(),
       base44.entities.Repayment.list(),
-      base44.entities.CollectionActivity.list(),
+      base44.entities.Collection.list(),
     ]).then(([l, r, c]) => {
       setLoans(l);
       setRepayments(r);
@@ -76,15 +76,15 @@ export default function Reports() {
   );
 
   // ── Portfolio KPIs ──────────────────────────────────────────────
-  const active      = loans.filter(l => l.status === 'disbursed');
+  const active      = loans.filter(l => l.status === 'open');
   const overdue     = loans.filter(l => l.status === 'overdue');
-  const repaid      = loans.filter(l => l.status === 'repaid');
+  const closed      = loans.filter(l => l.status === 'closed');
   const pending     = loans.filter(l => ['pending_cluster_approval','pending_zonal_approval'].includes(l.status));
 
-  const totalDisbursed   = active.reduce((s, l) => s + (l.amount || 0), 0);
-  const totalOverdue     = overdue.reduce((s, l) => s + (l.total_repayable || l.amount || 0), 0);
-  const totalRepaid      = repayments.reduce((s, r) => s + (r.amount_received || 0), 0);
-  const totalInterest    = repayments.reduce((s, r) => s + (r.interest_component || 0), 0);
+  const totalDisbursed   = active.reduce((s, l) => s + (l.principal || 0), 0);
+  const totalOverdue     = overdue.reduce((s, l) => s + (l.outstanding || 0), 0);
+  const totalRepaid      = closed.reduce((s, l) => s + (l.principal || 0), 0);
+  const totalInterest    = loans.reduce((s, l) => s + (l.charges || 0), 0);
 
   // ── Status Distribution (pie) ──────────────────────────────────
   const statusGroups = ['draft','pending_cluster_approval','pending_zonal_approval','approved','disbursed','repaid','overdue','rejected'];
@@ -102,20 +102,20 @@ export default function Reports() {
   ];
   const bucketData = buckets.map(b => ({
     label: b.label,
-    count: loans.filter(l => (l.amount || 0) >= b.min && (l.amount || 0) < b.max).length,
-    amount: loans.filter(l => (l.amount || 0) >= b.min && (l.amount || 0) < b.max).reduce((s, l) => s + (l.amount || 0), 0),
+    count: loans.filter(l => (l.principal || 0) >= b.min && (l.principal || 0) < b.max).length,
+    amount: loans.filter(l => (l.principal || 0) >= b.min && (l.principal || 0) < b.max).reduce((s, l) => s + (l.principal || 0), 0),
   }));
 
   // ── Branch / Manager Performance ────────────────────────────────
   const branchMap = {};
   loans.forEach(l => {
     const key = l.branch || 'Unassigned';
-    if (!branchMap[key]) branchMap[key] = { branch: key, total: 0, active: 0, overdue: 0, repaid: 0, amount: 0, overdueAmt: 0 };
+    if (!branchMap[key]) branchMap[key] = { branch: key, total: 0, active: 0, overdue: 0, closed: 0, amount: 0, overdueAmt: 0 };
     branchMap[key].total++;
-    branchMap[key].amount += l.amount || 0;
-    if (l.status === 'disbursed') branchMap[key].active++;
-    if (l.status === 'overdue')   { branchMap[key].overdue++; branchMap[key].overdueAmt += l.total_repayable || l.amount || 0; }
-    if (l.status === 'repaid')    branchMap[key].repaid++;
+    branchMap[key].amount += l.principal || 0;
+    if (l.status === 'open') branchMap[key].active++;
+    if (l.status === 'overdue')   { branchMap[key].overdue++; branchMap[key].overdueAmt += l.outstanding || 0; }
+    if (l.status === 'closed')    branchMap[key].closed++;
   });
   const branchData = Object.values(branchMap).sort((a, b) => b.amount - a.amount);
 
@@ -168,14 +168,14 @@ export default function Reports() {
       <div>
         <SectionHeader title="Portfolio Overview" sub="Live snapshot of your lending book" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Active Loans" value={active.length} sub={`₹ ${formatINR(totalDisbursed)} deployed`} icon={TrendingUp} color="blue" />
-          <StatCard title="Total Disbursed" value={formatINR(totalDisbursed)} sub={`across ${active.length} borrowers`} icon={IndianRupee} color="green" />
+          <StatCard title="Open Loans" value={active.length} sub={`₹ ${formatINR(totalDisbursed)} active`} icon={TrendingUp} color="blue" />
+          <StatCard title="Total Disbursed" value={formatINR(totalDisbursed)} sub={`across ${active.length} cases`} icon={IndianRupee} color="green" />
           <StatCard title="Overdue Exposure" value={formatINR(totalOverdue)} sub={`${overdue.length} loans overdue`} icon={AlertTriangle} color="red" />
-          <StatCard title="Total Repaid" value={formatINR(totalRepaid)} sub={`Interest earned: ${formatINR(totalInterest)}`} icon={CreditCard} color="purple" />
+          <StatCard title="Total Closed" value={formatINR(totalRepaid)} sub={`Charges earned: ${formatINR(totalInterest)}`} icon={CreditCard} color="purple" />
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
           <StatCard title="Pending Approvals" value={pending.length} sub="Awaiting action" icon={Users} color="yellow" />
-          <StatCard title="Repaid Loans" value={repaid.length} sub="Fully closed" icon={CreditCard} color="green" />
+          <StatCard title="Closed Loans" value={closed.length} sub="Fully collected" icon={CreditCard} color="green" />
           <StatCard title="Total Borrowers" value={new Set(loans.map(l => l.borrower_id).filter(Boolean)).size} sub="Unique businesses" icon={Users} color="blue" />
           <StatCard title="Total Loans" value={loans.length} sub="All time" icon={IndianRupee} color="purple" />
         </div>
@@ -288,7 +288,7 @@ export default function Reports() {
                   <th className="text-right py-2.5 font-medium">Total Loans</th>
                   <th className="text-right py-2.5 font-medium">Total Amount</th>
                   <th className="text-right py-2.5 font-medium">Active</th>
-                  <th className="text-right py-2.5 font-medium">Repaid</th>
+                  <th className="text-right py-2.5 font-medium">Closed</th>
                   <th className="text-right py-2.5 font-medium">Overdue</th>
                   <th className="text-right py-2.5 font-medium">Overdue Amount</th>
                   <th className="text-right py-2.5 font-medium">Recovery Rate</th>
@@ -296,14 +296,14 @@ export default function Reports() {
               </thead>
               <tbody>
                 {branchData.map(b => {
-                  const recoveryRate = b.total > 0 ? ((b.repaid / b.total) * 100).toFixed(0) : 0;
+                  const recoveryRate = b.total > 0 ? ((b.closed / b.total) * 100).toFixed(0) : 0;
                   return (
                     <tr key={b.branch} className="border-b border-border last:border-0 hover:bg-muted/20">
                       <td className="py-3 font-semibold">{b.branch}</td>
                       <td className="py-3 text-right">{b.total}</td>
                       <td className="py-3 text-right font-medium">{formatINR(b.amount)}</td>
                       <td className="py-3 text-right text-blue-600">{b.active}</td>
-                      <td className="py-3 text-right text-green-600">{b.repaid}</td>
+                      <td className="py-3 text-right text-green-600">{b.closed}</td>
                       <td className="py-3 text-right text-red-600">{b.overdue}</td>
                       <td className="py-3 text-right text-red-600 font-semibold">{formatINR(b.overdueAmt)}</td>
                       <td className="py-3 text-right">

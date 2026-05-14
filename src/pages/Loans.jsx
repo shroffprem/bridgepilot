@@ -7,13 +7,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatINR, calcCharges, calcGST, calcOutstanding } from '@/lib/mis';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
-const STATUS_LABELS = { pending_approval: 'Pending Approval', open: 'Open', closed: 'Closed', overdue: 'Overdue' };
+const STATUS_LABELS = {
+  pending_cluster_approval: 'Pending Cluster',
+  pending_zonal_approval: 'Pending Zonal',
+  open: 'Open',
+  closed: 'Closed',
+  overdue: 'Overdue',
+  rejected: 'Rejected',
+};
 const STATUS_STYLES = {
-  pending_approval: 'bg-blue-100 text-blue-800',
+  pending_cluster_approval: 'bg-blue-100 text-blue-800',
+  pending_zonal_approval: 'bg-orange-100 text-orange-800',
   open: 'bg-yellow-100 text-yellow-800',
   closed: 'bg-green-100 text-green-800',
   overdue: 'bg-red-100 text-red-800',
+  rejected: 'bg-red-100 text-red-700',
 };
 
 export default function Loans() {
@@ -23,10 +33,18 @@ export default function Loans() {
   const [clusterFilter, setClusterFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user, isBranchManager } = useCurrentUser();
 
   useEffect(() => {
-    base44.entities.Loan.list('-disbursement_date').then(l => { setLoans(l); setLoading(false); });
-  }, []);
+    base44.entities.Loan.list('-disbursement_date').then(all => {
+      // Branch managers only see their branch's loans
+      const filtered = isBranchManager && user?.branch
+        ? all.filter(l => l.branch?.toLowerCase() === user.branch?.toLowerCase())
+        : all;
+      setLoans(filtered);
+      setLoading(false);
+    });
+  }, [isBranchManager, user?.branch]);
 
   const clusters = [...new Set(loans.map(l => l.cluster).filter(Boolean))].sort();
   const today = new Date();
@@ -49,10 +67,12 @@ export default function Loans() {
           <SelectTrigger className="w-36"><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="pending_approval">Pending Approval</SelectItem>
+            <SelectItem value="pending_cluster_approval">Pending Cluster</SelectItem>
+            <SelectItem value="pending_zonal_approval">Pending Zonal</SelectItem>
             <SelectItem value="open">Open</SelectItem>
             <SelectItem value="closed">Closed</SelectItem>
             <SelectItem value="overdue">Overdue</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
         <Select value={clusterFilter} onValueChange={setClusterFilter}>

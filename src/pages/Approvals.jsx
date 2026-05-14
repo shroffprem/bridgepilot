@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { format } from 'date-fns';
 import { Eye, CheckSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -104,15 +105,23 @@ export default function Approvals() {
   const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user, isClusterManager, isZonalManager, isAdmin } = useCurrentUser();
 
   const load = () =>
     base44.entities.Loan.list('-created_date').then(all => {
-      setLoans(all.filter(l => ['pending_cluster_approval', 'pending_zonal_approval'].includes(l.status)));
+      const pending = all.filter(l => ['pending_cluster_approval', 'pending_zonal_approval'].includes(l.status));
+      // Cluster managers only see their cluster's pending loans
+      if (isClusterManager && user?.cluster) {
+        setLoans(pending.filter(l => l.cluster?.toLowerCase() === user.cluster?.toLowerCase()));
+      } else {
+        setLoans(pending);
+      }
       setLoading(false);
     });
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [isClusterManager, user?.cluster]);
 
+  // Zonal managers only see zonal queue; cluster managers only see cluster queue
   const clusterPending = loans.filter(l => l.status === 'pending_cluster_approval');
   const zonalPending   = loans.filter(l => l.status === 'pending_zonal_approval');
 
@@ -122,32 +131,43 @@ export default function Approvals() {
     </div>
   );
 
+  const showClusterQueue = isAdmin || isClusterManager;
+  const showZonalQueue   = isAdmin || isZonalManager;
+
   return (
     <div className="space-y-5">
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <div className="text-xs text-yellow-700 font-medium">Pending Cluster Approval</div>
-          <div className="text-2xl font-bold font-syne text-yellow-800 mt-1">{clusterPending.length}</div>
-        </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-          <div className="text-xs text-orange-700 font-medium">Pending Zonal Approval (&gt;₹10L)</div>
-          <div className="text-2xl font-bold font-syne text-orange-800 mt-1">{zonalPending.length}</div>
-        </div>
+        {showClusterQueue && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <div className="text-xs text-yellow-700 font-medium">Pending Cluster Approval</div>
+            <div className="text-2xl font-bold font-syne text-yellow-800 mt-1">{clusterPending.length}</div>
+          </div>
+        )}
+        {showZonalQueue && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+            <div className="text-xs text-orange-700 font-medium">Pending Zonal Approval (&gt;₹10L)</div>
+            <div className="text-2xl font-bold font-syne text-orange-800 mt-1">{zonalPending.length}</div>
+          </div>
+        )}
       </div>
 
-      <LoanTable
-        items={clusterPending}
-        title="Cluster Manager Approval Queue"
-        onUpdate={load}
-        navigate={navigate}
-      />
-      <LoanTable
-        items={zonalPending}
-        title="Zonal Manager Approval Queue  (Loans > ₹10L)"
-        onUpdate={load}
-        navigate={navigate}
-      />
+      {showClusterQueue && (
+        <LoanTable
+          items={clusterPending}
+          title={`Cluster Manager Approval Queue${isClusterManager && user?.cluster ? ` — ${user.cluster}` : ''}`}
+          onUpdate={load}
+          navigate={navigate}
+        />
+      )}
+      {showZonalQueue && (
+        <LoanTable
+          items={zonalPending}
+          title="Zonal Manager Approval Queue (Loans > ₹10L)"
+          onUpdate={load}
+          navigate={navigate}
+        />
+      )}
     </div>
   );
 }

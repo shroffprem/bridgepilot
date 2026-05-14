@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -61,6 +62,18 @@ export default function LoanForm() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const { user, isBranchManager } = useCurrentUser();
+
+  // Pre-fill branch/cluster for branch managers
+  useEffect(() => {
+    if (isBranchManager && user) {
+      setForm(p => ({
+        ...p,
+        branch: user.branch || p.branch,
+        cluster: user.cluster || p.cluster,
+      }));
+    }
+  }, [isBranchManager, user]);
 
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
   const setVal = (field, value) => setForm(p => ({ ...p, [field]: value }));
@@ -88,7 +101,8 @@ export default function LoanForm() {
       value_pledged: parseFloat(form.value_pledged) || 0,
       net_weight: parseFloat(form.net_weight) || 0,
       loan_number: loanNumber,
-      status: 'pending_approval',
+      status: 'pending_cluster_approval',
+      submitted_by: (await base44.auth.me())?.full_name || '',
     });
     navigate('/loans');
   };

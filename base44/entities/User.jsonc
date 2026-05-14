@@ -4,18 +4,24 @@
   "properties": {
     "role": {
       "type": "string",
-      "description": "The role of the user in the app",
       "enum": [
         "admin",
-        "user"
-      ]
+        "branch_manager",
+        "cluster_manager",
+        "zonal_manager"
+      ],
+      "default": "branch_manager"
+    },
+    "branch": {
+      "type": "string",
+      "description": "Branch this user manages (for branch_manager role)"
+    },
+    "cluster": {
+      "type": "string",
+      "description": "Cluster this user manages (for cluster_manager role)"
     },
     "phone": {
-      "type": "string",
-      "description": "Mobile number \u2014 used to match with TeamMember directory for scoped access"
+      "type": "string"
     }
-  },
-  "required": [
-    "role"
-  ]
+  }
 }

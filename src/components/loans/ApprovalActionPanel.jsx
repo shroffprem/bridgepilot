@@ -5,18 +5,24 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function ApprovalActionPanel({ loan, onUpdate }) {
   const [notes, setNotes] = useState('');
   const [rejectNotes, setRejectNotes] = useState('');
   const [showReject, setShowReject] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { user, isZonalManager } = useCurrentUser();
 
   const isClusterStage = loan.status === 'pending_cluster_approval';
   const isZonalStage   = loan.status === 'pending_zonal_approval';
-  if (!isClusterStage && !isZonalStage) return null;
 
-  const requiresZonal = (loan.amount || 0) >= 1000000;
+  // Zonal managers can only act on zonal-stage loans; cluster managers on cluster-stage
+  if (!isClusterStage && !isZonalStage) return null;
+  if (isZonalManager && !isZonalStage) return <div className="text-xs text-muted-foreground p-4">Awaiting cluster approval first.</div>;
+
+  const requiresZonal = (loan.principal || 0) >= 1000000;
+  const actorName = user?.full_name || user?.email || (isClusterStage ? 'Cluster Manager' : 'Zonal Manager');
   const role = isClusterStage ? 'Cluster Manager' : 'Zonal Manager';
   const nextStage = isClusterStage && requiresZonal ? 'Zonal Manager' : null;
 
@@ -24,13 +30,13 @@ export default function ApprovalActionPanel({ loan, onUpdate }) {
     setSaving(true);
     if (isClusterStage) {
       await base44.entities.Loan.update(loan.id, requiresZonal
-        ? { status: 'pending_zonal_approval', approval_stage: 'zonal', cluster_manager_notes: notes, approved_by_cluster: role }
-        : { status: 'approved', approval_stage: 'complete', cluster_manager_notes: notes, approved_by_cluster: role }
+        ? { status: 'pending_zonal_approval', approval_stage: 'zonal', cluster_manager_notes: notes, approved_by_cluster: actorName }
+        : { status: 'open', approval_stage: 'complete', cluster_manager_notes: notes, approved_by_cluster: actorName }
       );
     } else {
       await base44.entities.Loan.update(loan.id, {
-        status: 'approved', approval_stage: 'complete',
-        zonal_manager_notes: notes, approved_by_zonal: role
+        status: 'open', approval_stage: 'complete',
+        zonal_manager_notes: notes, approved_by_zonal: actorName
       });
     }
     setSaving(false);

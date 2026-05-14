@@ -10,6 +10,7 @@ const pageTitles = {
   '/borrowers': 'Borrowers',
   '/repayments': 'Repayments',
   '/collections': 'Collections',
+  '/reports': 'Reports',
 };
 
 export default function TopBar() {

@@ -8,7 +8,8 @@ import {
   AlertTriangle,
   CheckSquare,
   ChevronRight,
-  Building2
+  Building2,
+  BarChart2
 } from 'lucide-react';
 
 const navItems = [
@@ -18,6 +19,7 @@ const navItems = [
   { label: 'Borrowers', icon: Users, path: '/borrowers' },
   { label: 'Repayments', icon: CreditCard, path: '/repayments' },
   { label: 'Collections', icon: AlertTriangle, path: '/collections' },
+  { label: 'Reports', icon: BarChart2, path: '/reports' },
 ];
 
 export default function Sidebar() {

@@ -1,0 +1,53 @@
+{
+  "name": "Company",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Company / lender name"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "lender",
+        "partner",
+        "nbfc",
+        "bank",
+        "other"
+      ],
+      "description": "Type of company"
+    },
+    "cin": {
+      "type": "string",
+      "description": "Corporate Identification Number"
+    },
+    "gstin": {
+      "type": "string"
+    },
+    "registered_address": {
+      "type": "string"
+    },
+    "operational_address": {
+      "type": "string"
+    },
+    "website": {
+      "type": "string"
+    },
+    "primary_contact_name": {
+      "type": "string"
+    },
+    "primary_contact_phone": {
+      "type": "string"
+    },
+    "primary_contact_email": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "type"
+  ]
+}

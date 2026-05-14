@@ -1,0 +1,64 @@
+{
+  "name": "TeamMember",
+  "type": "object",
+  "properties": {
+    "full_name": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "zonal_manager",
+        "cluster_manager",
+        "branch_manager",
+        "managing_partner",
+        "other"
+      ]
+    },
+    "employee_id": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "zone": {
+      "type": "string"
+    },
+    "cluster": {
+      "type": "string"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "reports_to": {
+      "type": "string",
+      "description": "Name or ID of the manager this person reports to"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "Reference to Company entity"
+    },
+    "joined_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive"
+      ],
+      "default": "active"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "full_name",
+    "role"
+  ]
+}

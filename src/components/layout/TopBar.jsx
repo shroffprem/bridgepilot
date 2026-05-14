@@ -11,6 +11,7 @@ const pageTitles = {
   '/repayments': 'Repayments',
   '/collections': 'Collections',
   '/reports': 'Reports',
+  '/directory': 'Master Directory',
 };
 
 export default function TopBar() {

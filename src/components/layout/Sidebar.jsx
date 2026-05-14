@@ -20,6 +20,7 @@ const navItems = [
   { label: 'Repayments', icon: CreditCard, path: '/repayments' },
   { label: 'Collections', icon: AlertTriangle, path: '/collections' },
   { label: 'Reports', icon: BarChart2, path: '/reports' },
+  { label: 'Master Directory', icon: Building2, path: '/directory' },
 ];
 
 export default function Sidebar() {

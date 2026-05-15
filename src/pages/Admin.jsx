@@ -160,67 +160,65 @@ export default function Admin() {
         {loading ? (
           <div className="flex justify-center py-12"><div className="w-7 h-7 border-4 border-muted border-t-primary rounded-full animate-spin" /></div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
-                  <th className="text-left px-4 py-3 font-medium">Name</th>
-                  <th className="text-left px-4 py-3 font-medium">Email</th>
-                  <th className="text-left px-4 py-3 font-medium">Role</th>
-                  <th className="text-left px-4 py-3 font-medium">Cluster</th>
-                  <th className="text-left px-4 py-3 font-medium">Branch</th>
-                  <th className="text-center px-4 py-3 font-medium">Change Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(u => (
-                  <tr key={u.id} className="border-t border-border hover:bg-muted/30">
-                    <td className="px-4 py-3 font-medium">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <User size={13} className="text-primary" />
-                        </div>
-                        {u.full_name || '—'}
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-muted/40 text-muted-foreground uppercase tracking-wide">
+                <th className="text-left px-3 py-2 font-medium">Name</th>
+                <th className="text-left px-3 py-2 font-medium">Email</th>
+                <th className="text-left px-3 py-2 font-medium">Role</th>
+                <th className="text-left px-3 py-2 font-medium">Cluster</th>
+                <th className="text-left px-3 py-2 font-medium">Branch</th>
+                <th className="text-center px-3 py-2 font-medium">Change Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-3 py-2 font-medium">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <User size={13} className="text-primary" />
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_STYLES[u.role] || 'bg-muted text-muted-foreground'}`}>
-                        {ROLE_LABELS[u.role] || u.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Input
-                        className="h-7 text-xs w-28"
-                        defaultValue={u.cluster || ''}
-                        placeholder="e.g. Mysore"
-                        onBlur={e => { if (e.target.value !== (u.cluster || '')) handleFieldChange(u.id, 'cluster', e.target.value); }}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <Input
-                        className="h-7 text-xs w-28"
-                        defaultValue={u.branch || ''}
-                        placeholder="e.g. Vijay Nagar"
-                        onBlur={e => { if (e.target.value !== (u.branch || '')) handleFieldChange(u.id, 'branch', e.target.value); }}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Select value={u.role} onValueChange={val => handleRoleChange(u.id, val)}>
-                        <SelectTrigger className="w-36 h-7 text-xs mx-auto"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="branch_manager">Branch Manager</SelectItem>
-                          <SelectItem value="cluster_manager">Cluster Manager</SelectItem>
-                          <SelectItem value="zonal_manager">Zonal Manager</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      {u.full_name || '—'}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{u.email}</td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_STYLES[u.role] || 'bg-muted text-muted-foreground'}`}>
+                      {ROLE_LABELS[u.role] || u.role}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input
+                      className="h-7 text-xs w-24"
+                      defaultValue={u.cluster || ''}
+                      placeholder="e.g. Mysore"
+                      onBlur={e => { if (e.target.value !== (u.cluster || '')) handleFieldChange(u.id, 'cluster', e.target.value); }}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Input
+                      className="h-7 text-xs w-24"
+                      defaultValue={u.branch || ''}
+                      placeholder="e.g. Vijay Nagar"
+                      onBlur={e => { if (e.target.value !== (u.branch || '')) handleFieldChange(u.id, 'branch', e.target.value); }}
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <Select value={u.role} onValueChange={val => handleRoleChange(u.id, val)}>
+                      <SelectTrigger className="w-32 h-7 text-xs mx-auto"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="branch_manager">Branch Mgr</SelectItem>
+                        <SelectItem value="cluster_manager">Cluster Mgr</SelectItem>
+                        <SelectItem value="zonal_manager">Zonal Mgr</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
       </div>}

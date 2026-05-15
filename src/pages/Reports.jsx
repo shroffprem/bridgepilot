@@ -247,30 +247,28 @@ export default function Reports() {
         {overdue.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-sm">No overdue loans 🎉</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-muted-foreground uppercase">
-                  <th className="text-left py-2.5 font-medium">Ageing Bucket</th>
-                  <th className="text-right py-2.5 font-medium">No. of Loans</th>
-                  <th className="text-right py-2.5 font-medium">Amount at Risk</th>
-                  <th className="text-right py-2.5 font-medium">% of Total Overdue</th>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground uppercase">
+                <th className="text-left px-2 py-2 font-medium">Ageing Bucket</th>
+                <th className="text-right px-2 py-2 font-medium">Loans</th>
+                <th className="text-right px-2 py-2 font-medium">Amount at Risk</th>
+                <th className="text-right px-2 py-2 font-medium">% of Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ageingData.map(a => (
+                <tr key={a.label} className="border-b border-border last:border-0">
+                  <td className="px-2 py-2 font-medium">{a.label}</td>
+                  <td className="px-2 py-2 text-right">{a.count}</td>
+                  <td className="px-2 py-2 text-right text-red-600 font-semibold">{formatINR(a.amount)}</td>
+                  <td className="px-2 py-2 text-right text-muted-foreground">
+                    {totalOverdue > 0 ? ((a.amount / totalOverdue) * 100).toFixed(1) : 0}%
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {ageingData.map(a => (
-                  <tr key={a.label} className="border-b border-border last:border-0">
-                    <td className="py-3 font-medium">{a.label}</td>
-                    <td className="py-3 text-right">{a.count}</td>
-                    <td className="py-3 text-right text-red-600 font-semibold">{formatINR(a.amount)}</td>
-                    <td className="py-3 text-right text-muted-foreground">
-                      {totalOverdue > 0 ? ((a.amount / totalOverdue) * 100).toFixed(1) : 0}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -280,43 +278,41 @@ export default function Reports() {
         {branchData.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-sm">No branch data</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-muted-foreground uppercase">
-                  <th className="text-left py-2.5 font-medium">Branch</th>
-                  <th className="text-right py-2.5 font-medium">Total Loans</th>
-                  <th className="text-right py-2.5 font-medium">Total Amount</th>
-                  <th className="text-right py-2.5 font-medium">Active</th>
-                  <th className="text-right py-2.5 font-medium">Closed</th>
-                  <th className="text-right py-2.5 font-medium">Overdue</th>
-                  <th className="text-right py-2.5 font-medium">Overdue Amount</th>
-                  <th className="text-right py-2.5 font-medium">Recovery Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {branchData.map(b => {
-                  const recoveryRate = b.total > 0 ? ((b.closed / b.total) * 100).toFixed(0) : 0;
-                  return (
-                    <tr key={b.branch} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="py-3 font-semibold">{b.branch}</td>
-                      <td className="py-3 text-right">{b.total}</td>
-                      <td className="py-3 text-right font-medium">{formatINR(b.amount)}</td>
-                      <td className="py-3 text-right text-blue-600">{b.active}</td>
-                      <td className="py-3 text-right text-green-600">{b.closed}</td>
-                      <td className="py-3 text-right text-red-600">{b.overdue}</td>
-                      <td className="py-3 text-right text-red-600 font-semibold">{formatINR(b.overdueAmt)}</td>
-                      <td className="py-3 text-right">
-                        <span className={`font-semibold ${Number(recoveryRate) >= 70 ? 'text-green-600' : Number(recoveryRate) >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
-                          {recoveryRate}%
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground uppercase">
+                <th className="text-left px-2 py-2 font-medium">Branch</th>
+                <th className="text-right px-2 py-2 font-medium">Loans</th>
+                <th className="text-right px-2 py-2 font-medium">Amount</th>
+                <th className="text-right px-2 py-2 font-medium">Active</th>
+                <th className="text-right px-2 py-2 font-medium">Closed</th>
+                <th className="text-right px-2 py-2 font-medium">Overdue</th>
+                <th className="text-right px-2 py-2 font-medium">Overdue Amt</th>
+                <th className="text-right px-2 py-2 font-medium">Recovery</th>
+              </tr>
+            </thead>
+            <tbody>
+              {branchData.map(b => {
+                const recoveryRate = b.total > 0 ? ((b.closed / b.total) * 100).toFixed(0) : 0;
+                return (
+                  <tr key={b.branch} className="border-b border-border last:border-0 hover:bg-muted/20">
+                    <td className="px-2 py-2 font-semibold">{b.branch}</td>
+                    <td className="px-2 py-2 text-right">{b.total}</td>
+                    <td className="px-2 py-2 text-right font-medium">{formatINR(b.amount)}</td>
+                    <td className="px-2 py-2 text-right text-blue-600">{b.active}</td>
+                    <td className="px-2 py-2 text-right text-green-600">{b.closed}</td>
+                    <td className="px-2 py-2 text-right text-red-600">{b.overdue}</td>
+                    <td className="px-2 py-2 text-right text-red-600 font-semibold">{formatINR(b.overdueAmt)}</td>
+                    <td className="px-2 py-2 text-right">
+                      <span className={`font-semibold ${Number(recoveryRate) >= 70 ? 'text-green-600' : Number(recoveryRate) >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {recoveryRate}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -339,32 +335,30 @@ export default function Reports() {
                 <Bar dataKey="promises" name="Promises" fill="#f59e0b" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div className="overflow-x-auto mt-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground uppercase">
-                    <th className="text-left py-2.5 font-medium">Handler</th>
-                    <th className="text-right py-2.5 font-medium">Total Activities</th>
-                    <th className="text-right py-2.5 font-medium">Calls</th>
-                    <th className="text-right py-2.5 font-medium">Visits</th>
-                    <th className="text-right py-2.5 font-medium">Promises</th>
-                    <th className="text-right py-2.5 font-medium">Promise Amount</th>
+            <table className="w-full text-xs mt-4">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground uppercase">
+                  <th className="text-left px-2 py-2 font-medium">Handler</th>
+                  <th className="text-right px-2 py-2 font-medium">Total</th>
+                  <th className="text-right px-2 py-2 font-medium">Calls</th>
+                  <th className="text-right px-2 py-2 font-medium">Visits</th>
+                  <th className="text-right px-2 py-2 font-medium">Promises</th>
+                  <th className="text-right px-2 py-2 font-medium">Promise Amt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {handlerData.map(h => (
+                  <tr key={h.handler} className="border-b border-border last:border-0 hover:bg-muted/20">
+                    <td className="px-2 py-2 font-semibold">{h.handler}</td>
+                    <td className="px-2 py-2 text-right">{h.total}</td>
+                    <td className="px-2 py-2 text-right text-blue-600">{h.calls}</td>
+                    <td className="px-2 py-2 text-right text-green-600">{h.visits}</td>
+                    <td className="px-2 py-2 text-right text-yellow-600">{h.promises}</td>
+                    <td className="px-2 py-2 text-right font-semibold">{formatINR(h.promiseAmt)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {handlerData.map(h => (
-                    <tr key={h.handler} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="py-3 font-semibold">{h.handler}</td>
-                      <td className="py-3 text-right">{h.total}</td>
-                      <td className="py-3 text-right text-blue-600">{h.calls}</td>
-                      <td className="py-3 text-right text-green-600">{h.visits}</td>
-                      <td className="py-3 text-right text-yellow-600">{h.promises}</td>
-                      <td className="py-3 text-right font-semibold">{formatINR(h.promiseAmt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </>
         )}
       </div>

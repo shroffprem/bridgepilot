@@ -158,45 +158,42 @@ export default function Loans() {
 
       {/* Table — desktop */}
       <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
-                {['#', 'Date', 'Customer', 'Cluster', 'Branch', 'Principal', 'Charges', 'Outstanding', 'Status', ''].map(h => (
-                  <th key={h} className={`px-4 py-2.5 font-medium ${['Principal','Charges','Outstanding'].includes(h) ? 'text-right' : h === '' ? 'text-center' : 'text-left'}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-10 text-muted-foreground">No cases found</td></tr>
-              ) : filtered.map((l, i) => {
-                const charges = calcCharges(l);
-                const outstanding = calcOutstanding(l);
-                return (
-                  <tr key={l.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => window.location.href = `/loans/${l.id}`}>
-                    <td className="px-4 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM-yy') : '—'}</td>
-                    <td className="px-4 py-2.5 font-medium text-foreground">{l.borrower_name}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{l.cluster || '—'}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{l.branch || '—'}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold">{formatINR(l.principal)}</td>
-                    <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(charges)}</td>
-                    <td className={`px-4 py-2.5 text-right font-semibold ${l.status === 'overdue' ? 'text-red-600' : ''}`}>{formatINR(outstanding)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[l.status] || 'bg-gray-100 text-gray-600'}`}>
-                        {STATUS_LABELS[l.status] || l.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <ChevronRight size={14} className="text-muted-foreground inline" />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-muted/40 text-muted-foreground uppercase tracking-wide">
+              {['#', 'Date', 'Customer', 'Cluster/Branch', 'Principal', 'Charges', 'Outstanding', 'Status', ''].map(h => (
+                <th key={h} className={`px-2 py-2 font-medium ${['Principal','Charges','Outstanding'].includes(h) ? 'text-right' : h === '' ? 'text-center' : 'text-left'}`}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={9} className="text-center py-10 text-muted-foreground">No cases found</td></tr>
+            ) : filtered.map((l, i) => {
+              const charges = calcCharges(l);
+              const outstanding = calcOutstanding(l);
+              return (
+                <tr key={l.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => window.location.href = `/loans/${l.id}`}>
+                  <td className="px-2 py-2 text-muted-foreground">{i + 1}</td>
+                  <td className="px-2 py-2 text-muted-foreground whitespace-nowrap">{l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM') : '—'}</td>
+                  <td className="px-2 py-2 font-medium max-w-[150px] truncate">{l.borrower_name}</td>
+                  <td className="px-2 py-2 text-muted-foreground">{[l.cluster, l.branch].filter(Boolean).join(' / ') || '—'}</td>
+                  <td className="px-2 py-2 text-right font-semibold">{formatINR(l.principal)}</td>
+                  <td className="px-2 py-2 text-right text-muted-foreground">{formatINR(charges)}</td>
+                  <td className={`px-2 py-2 text-right font-semibold ${l.status === 'overdue' ? 'text-red-600' : ''}`}>{formatINR(outstanding)}</td>
+                  <td className="px-2 py-2">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[l.status] || 'bg-gray-100 text-gray-600'}`}>
+                      {STATUS_LABELS[l.status] || l.status}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-center">
+                    <ChevronRight size={14} className="text-muted-foreground inline" />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {/* Cards — mobile */}

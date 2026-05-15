@@ -4,10 +4,12 @@ import { differenceInDays } from 'date-fns';
 import { formatINR } from '@/lib/mis';
 
 const BUCKETS = [
-  { label: '0–30 days', min: 0, max: 30, color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
-  { label: '31–60 days', min: 31, max: 60, color: 'text-orange-600 bg-orange-50 border-orange-200' },
-  { label: '61–90 days', min: 61, max: 90, color: 'text-red-500 bg-red-50 border-red-200' },
-  { label: '90+ days', min: 91, max: Infinity, color: 'text-red-800 bg-red-100 border-red-300' },
+  { label: '1–7 days', min: 1, max: 7, color: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
+  { label: '1–2 weeks', min: 8, max: 14, color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  { label: '2–3 weeks', min: 15, max: 21, color: 'text-orange-600 bg-orange-50 border-orange-200' },
+  { label: '3–4 weeks', min: 22, max: 28, color: 'text-red-500 bg-red-50 border-red-200' },
+  { label: '4–6 weeks', min: 29, max: 42, color: 'text-red-700 bg-red-100 border-red-300' },
+  { label: '6+ weeks', min: 43, max: Infinity, color: 'text-red-900 bg-red-200 border-red-400' },
 ];
 
 export default function OverdueAgeing({ loans }) {
@@ -31,7 +33,7 @@ export default function OverdueAgeing({ loans }) {
         <h3 className="font-syne font-semibold text-sm">Overdue Ageing Buckets</h3>
         <span className="ml-auto text-xs text-muted-foreground">{overdueLoans.length} overdue cases</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-border">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y lg:divide-y-0 divide-border">
         {BUCKETS.map(b => {
           const group = overdueLoans.filter(l => {
             const days = differenceInDays(today, new Date(l.disbursement_date));

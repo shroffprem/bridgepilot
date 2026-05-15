@@ -13,6 +13,8 @@ import { BadgeCheck, Loader2, ClipboardPaste } from 'lucide-react';
 
 export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) {
   const [saving, setSaving] = useState(false);
+  const [noteTab, setNoteTab] = useState('paste'); // 'paste' | 'upload'
+  const [pastedImage, setPastedImage] = useState(null);
   const charges = calcCharges(loan || {});
   const gst = loan?.gst != null ? loan.gst : calcGST(charges);
   const totalDue = calcOutstanding(loan || {});
@@ -36,6 +38,26 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
   const pasteField = async (field) => {
     const text = await navigator.clipboard.readText();
     setForm(p => ({ ...p, [field]: text.trim() }));
+  };
+
+  const handleImagePaste = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find(t => t.startsWith('image/'));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const file = new File([blob], 'credit_note.png', { type: imageType });
+          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+          setForm(p => ({ ...p, credit_note_image_url: file_url }));
+          setPastedImage(file_url);
+          return;
+        }
+      }
+      alert('No image found in clipboard. Copy an image first.');
+    } catch {
+      alert('Could not read clipboard. Please allow clipboard access.');
+    }
   };
 
   const handleSave = async () => {
@@ -71,21 +93,22 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <BadgeCheck size={16} className="text-green-600" />
             Record Collection — {loan?.borrower_name}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="bg-muted rounded-lg p-3 text-sm space-y-1 mt-1">
-          <div className="flex justify-between"><span className="text-muted-foreground">Principal</span><span className="font-semibold">{formatINR(loan.principal)}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Charges + GST</span><span>{formatINR(charges + gst)}</span></div>
-          <div className="flex justify-between font-bold border-t border-border pt-1 mt-1"><span>Total Due</span><span className="text-red-600">{formatINR(totalDue)}</span></div>
-        </div>
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 pr-1 space-y-4">
+          <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
+            <div className="flex justify-between"><span className="text-muted-foreground">Principal</span><span className="font-semibold">{formatINR(loan.principal)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Charges + GST</span><span>{formatINR(charges + gst)}</span></div>
+            <div className="flex justify-between font-bold border-t border-border pt-1 mt-1"><span>Total Due</span><span className="text-red-600">{formatINR(totalDue)}</span></div>
+          </div>
 
-        <div className="space-y-4 mt-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Amount Collected (₹)</Label>
@@ -101,6 +124,7 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
               </div>
             </div>
           </div>
+
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Principal (₹)</Label>
@@ -115,6 +139,7 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
               <Input type="number" value={form.gst_component} onChange={set('gst_component')} />
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Credit Note Date</Label>
@@ -137,14 +162,52 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
               </Select>
             </div>
           </div>
-          <div className="space-y-1">
-            <Label>Upload Credit Note (Bank Screenshot / Scan)</Label>
-            <ImageUploadField
-              label="Credit Note"
-              imageUrl={form.credit_note_image_url}
-              onUpload={url => setForm(p => ({ ...p, credit_note_image_url: url }))}
-            />
+
+          {/* Credit Note Image — Paste or Upload tabs */}
+          <div className="space-y-2">
+            <Label>Credit Note (Bank Screenshot)</Label>
+            <div className="flex border border-border rounded-lg overflow-hidden text-sm">
+              <button
+                type="button"
+                onClick={() => setNoteTab('paste')}
+                className={`flex-1 py-1.5 font-medium transition-colors ${noteTab === 'paste' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+              >
+                Paste Image
+              </button>
+              <button
+                type="button"
+                onClick={() => setNoteTab('upload')}
+                className={`flex-1 py-1.5 font-medium transition-colors ${noteTab === 'upload' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+              >
+                Upload File
+              </button>
+            </div>
+            {noteTab === 'paste' ? (
+              <div className="space-y-2">
+                <Button type="button" variant="outline" className="w-full gap-2" onClick={handleImagePaste}>
+                  <ClipboardPaste size={14} />
+                  Paste from Clipboard (Ctrl+V / Cmd+V screenshot)
+                </Button>
+                {(pastedImage || form.credit_note_image_url) && (
+                  <div className="relative">
+                    <img src={pastedImage || form.credit_note_image_url} alt="Credit Note" className="w-full rounded-lg border border-border max-h-32 object-contain bg-muted" />
+                    <button
+                      type="button"
+                      onClick={() => { setPastedImage(null); setForm(p => ({ ...p, credit_note_image_url: '' })); }}
+                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded"
+                    >Remove</button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <ImageUploadField
+                label="Credit Note"
+                imageUrl={form.credit_note_image_url}
+                onUpload={url => { setForm(p => ({ ...p, credit_note_image_url: url })); setPastedImage(url); }}
+              />
+            )}
           </div>
+
           <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
             <input
               type="checkbox"
@@ -158,13 +221,15 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
               <Input type="date" value={form.closure_date} onChange={set('closure_date')} className="ml-auto w-36 h-7 text-xs" />
             )}
           </div>
+
           <div className="space-y-1">
             <Label>Notes</Label>
             <Textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="Any additional notes…" />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 mt-2">
+        {/* Sticky footer */}
+        <div className="flex justify-end gap-2 pt-3 border-t border-border shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2 bg-green-600 hover:bg-green-700">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />}

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserPlus, ShieldCheck, User } from 'lucide-react';
 import LoanCsvImport from '@/components/admin/LoanCsvImport';
+import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
 
 const ROLE_LABELS = {
   admin: 'Admin',
@@ -73,6 +74,9 @@ export default function Admin() {
         <p className="text-sm text-muted-foreground mt-1">Manage user access and roles for BridgeLine Partners.</p>
       </div>
 
+      {/* WhatsApp Notifications */}
+      <WhatsAppSettings />
+
       {/* Bulk CSV Import */}
       <LoanCsvImport />
 
@@ -139,7 +143,6 @@ export default function Admin() {
                   <th className="text-left px-4 py-3 font-medium">Role</th>
                   <th className="text-left px-4 py-3 font-medium">Cluster</th>
                   <th className="text-left px-4 py-3 font-medium">Branch</th>
-                  <th className="text-left px-4 py-3 font-medium">WhatsApp No.</th>
                   <th className="text-center px-4 py-3 font-medium">Change Role</th>
                 </tr>
               </thead>
@@ -174,14 +177,6 @@ export default function Admin() {
                         defaultValue={u.branch || ''}
                         placeholder="e.g. Vijay Nagar"
                         onBlur={e => { if (e.target.value !== (u.branch || '')) handleFieldChange(u.id, 'branch', e.target.value); }}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <Input
-                        className="h-7 text-xs w-32"
-                        defaultValue={u.phone || ''}
-                        placeholder="10-digit mobile"
-                        onBlur={e => { if (e.target.value !== (u.phone || '')) handleFieldChange(u.id, 'phone', e.target.value); }}
                       />
                     </td>
                     <td className="px-4 py-3 text-center">

@@ -152,63 +152,57 @@ export default function Dashboard() {
               {portfolioTab === 'mtd' ? `${format(today, 'MMMM yyyy')} Breakdown` : `${currentYear} — Month-wise Breakdown`}
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
-                  {['Month', 'Cases', 'Volume', 'Charges', 'GST', 'Collected', 'Outstanding', 'Closed', 'Open', 'ROI%'].map(h => (
-                    <th key={h} className={`px-3 py-2 font-medium ${h === 'Month' ? 'text-left' : 'text-right'}`}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {activeMonthly.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center py-6 text-muted-foreground text-sm">No data for this period</td></tr>
-                ) : activeMonthly.map(m => {
-                  const roi = m.volume > 0 ? ((m.charges / m.volume) * 100).toFixed(3) : '0';
-                  const isCurrent = m.month === currentMonth;
-                  return (
-                    <tr key={m.month} className={`border-t border-border ${isCurrent ? 'bg-accent/20 font-semibold' : 'hover:bg-muted/30'}`}>
-                      <td className="px-3 py-2.5">{m.month}</td>
-                      <td className="px-3 py-2.5 text-right">{m.cases}</td>
-                      <td className="px-3 py-2.5 text-right">{formatINR(m.volume)}</td>
-                      <td className="px-3 py-2.5 text-right text-primary font-semibold">{formatINR(m.charges)}</td>
-                      <td className="px-3 py-2.5 text-right text-muted-foreground">{formatINR(m.gst)}</td>
-                      <td className="px-3 py-2.5 text-right text-green-600">{formatINR(m.collected)}</td>
-                      <td className={`px-3 py-2.5 text-right ${m.outstanding > 0 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{formatINR(m.outstanding)}</td>
-                      <td className="px-3 py-2.5 text-right">{m.closed}</td>
-                      <td className="px-3 py-2.5 text-right">{m.open}</td>
-                      <td className="px-3 py-2.5 text-right text-xs font-semibold text-primary">{roi}%</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              {activeMonthly.length > 1 && (() => {
-                const tot = activeMonthly.reduce((s, m) => ({
-                  cases: s.cases + m.cases, volume: s.volume + m.volume, charges: s.charges + m.charges,
-                  gst: s.gst + m.gst, collected: s.collected + m.collected, outstanding: s.outstanding + m.outstanding,
-                  closed: s.closed + m.closed, open: s.open + m.open,
-                }), { cases: 0, volume: 0, charges: 0, gst: 0, collected: 0, outstanding: 0, closed: 0, open: 0 });
-                const roi = tot.volume > 0 ? ((tot.charges / tot.volume) * 100).toFixed(3) : '0';
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-muted/40 text-muted-foreground uppercase tracking-wide">
+                {['Month', 'Cases', 'Volume', 'Charges', 'Collected', 'Outstanding', 'Cl/Op', 'ROI%'].map(h => (
+                  <th key={h} className={`px-2 py-2 font-medium ${h === 'Month' ? 'text-left' : 'text-right'}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {activeMonthly.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-6 text-muted-foreground">No data for this period</td></tr>
+              ) : activeMonthly.map(m => {
+                const roi = m.volume > 0 ? ((m.charges / m.volume) * 100).toFixed(2) : '0';
+                const isCurrent = m.month === currentMonth;
                 return (
-                  <tfoot>
-                    <tr className="border-t-2 border-border bg-muted/60 font-bold text-sm">
-                      <td className="px-3 py-2.5">TOTAL</td>
-                      <td className="px-3 py-2.5 text-right">{tot.cases}</td>
-                      <td className="px-3 py-2.5 text-right">{formatINR(tot.volume)}</td>
-                      <td className="px-3 py-2.5 text-right text-primary">{formatINR(tot.charges)}</td>
-                      <td className="px-3 py-2.5 text-right">{formatINR(tot.gst)}</td>
-                      <td className="px-3 py-2.5 text-right text-green-600">{formatINR(tot.collected)}</td>
-                      <td className="px-3 py-2.5 text-right text-red-600">{formatINR(tot.outstanding)}</td>
-                      <td className="px-3 py-2.5 text-right">{tot.closed}</td>
-                      <td className="px-3 py-2.5 text-right">{tot.open}</td>
-                      <td className="px-3 py-2.5 text-right text-primary">{roi}%</td>
-                    </tr>
-                  </tfoot>
+                  <tr key={m.month} className={`border-t border-border ${isCurrent ? 'bg-accent/20 font-semibold' : 'hover:bg-muted/30'}`}>
+                    <td className="px-2 py-2">{m.month}</td>
+                    <td className="px-2 py-2 text-right">{m.cases}</td>
+                    <td className="px-2 py-2 text-right">{formatINR(m.volume)}</td>
+                    <td className="px-2 py-2 text-right text-primary font-semibold">{formatINR(m.charges)}</td>
+                    <td className="px-2 py-2 text-right text-green-600">{formatINR(m.collected)}</td>
+                    <td className={`px-2 py-2 text-right ${m.outstanding > 0 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{formatINR(m.outstanding)}</td>
+                    <td className="px-2 py-2 text-right text-muted-foreground">{m.closed}/{m.open}</td>
+                    <td className="px-2 py-2 text-right font-semibold text-primary">{roi}%</td>
+                  </tr>
                 );
-              })()}
-            </table>
-          </div>
+              })}
+            </tbody>
+            {activeMonthly.length > 1 && (() => {
+              const tot = activeMonthly.reduce((s, m) => ({
+                cases: s.cases + m.cases, volume: s.volume + m.volume, charges: s.charges + m.charges,
+                collected: s.collected + m.collected, outstanding: s.outstanding + m.outstanding,
+                closed: s.closed + m.closed, open: s.open + m.open,
+              }), { cases: 0, volume: 0, charges: 0, collected: 0, outstanding: 0, closed: 0, open: 0 });
+              const roi = tot.volume > 0 ? ((tot.charges / tot.volume) * 100).toFixed(2) : '0';
+              return (
+                <tfoot>
+                  <tr className="border-t-2 border-border bg-muted/60 font-bold text-xs">
+                    <td className="px-2 py-2">TOTAL</td>
+                    <td className="px-2 py-2 text-right">{tot.cases}</td>
+                    <td className="px-2 py-2 text-right">{formatINR(tot.volume)}</td>
+                    <td className="px-2 py-2 text-right text-primary">{formatINR(tot.charges)}</td>
+                    <td className="px-2 py-2 text-right text-green-600">{formatINR(tot.collected)}</td>
+                    <td className="px-2 py-2 text-right text-red-600">{formatINR(tot.outstanding)}</td>
+                    <td className="px-2 py-2 text-right">{tot.closed}/{tot.open}</td>
+                    <td className="px-2 py-2 text-right text-primary">{roi}%</td>
+                  </tr>
+                </tfoot>
+              );
+            })()}
+          </table>
         </div>
       </div>
 
@@ -248,62 +242,51 @@ export default function Dashboard() {
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <h3 className="font-syne font-semibold text-sm">Open Cases — All Clusters</h3>
-          <Link to="/loans" className="text-xs text-primary hover:underline">View All Loans →</Link>
+          <Link to="/loans" className="text-xs text-primary hover:underline">View All →</Link>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
-                <th className="text-left px-4 py-2.5 font-medium">#</th>
-                <th className="text-left px-4 py-2.5 font-medium">Date</th>
-                <th className="text-left px-4 py-2.5 font-medium">Customer</th>
-                <th className="text-left px-4 py-2.5 font-medium">Cluster</th>
-                <th className="text-left px-4 py-2.5 font-medium">Branch</th>
-                <th className="text-right px-4 py-2.5 font-medium">Principal</th>
-                <th className="text-right px-4 py-2.5 font-medium">Charges</th>
-                <th className="text-right px-4 py-2.5 font-medium">GST</th>
-                <th className="text-right px-4 py-2.5 font-medium">Outstanding</th>
-                <th className="text-right px-4 py-2.5 font-medium">Days</th>
-                <th className="text-right px-4 py-2.5 font-medium">Rate</th>
-                <th className="text-center px-4 py-2.5 font-medium">Status</th>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-muted/40 text-muted-foreground uppercase tracking-wide">
+              <th className="text-left px-2 py-2 font-medium">#</th>
+              <th className="text-left px-2 py-2 font-medium">Date</th>
+              <th className="text-left px-2 py-2 font-medium">Customer</th>
+              <th className="text-left px-2 py-2 font-medium hidden sm:table-cell">Cluster / Branch</th>
+              <th className="text-right px-2 py-2 font-medium">Principal</th>
+              <th className="text-right px-2 py-2 font-medium">Charges</th>
+              <th className="text-right px-2 py-2 font-medium">Outstanding</th>
+              <th className="text-right px-2 py-2 font-medium">Days</th>
+              <th className="text-right px-2 py-2 font-medium hidden md:table-cell">Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {openCases.length === 0 ? (
+              <tr><td colSpan={9} className="text-center py-10 text-muted-foreground">No open cases</td></tr>
+            ) : openCases.map((l, i) => (
+              <tr key={l.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => window.location.href=`/loans/${l.id}`}>
+                <td className="px-2 py-2 text-muted-foreground">{i + 1}</td>
+                <td className="px-2 py-2 text-muted-foreground whitespace-nowrap">{l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM') : '—'}</td>
+                <td className="px-2 py-2 font-medium max-w-[120px] truncate">{l.borrower_name}</td>
+                <td className="px-2 py-2 text-muted-foreground hidden sm:table-cell">{[l.cluster, l.branch].filter(Boolean).join(' / ') || '—'}</td>
+                <td className="px-2 py-2 text-right font-semibold">{formatINR(l.principal)}</td>
+                <td className="px-2 py-2 text-right text-muted-foreground">{formatINR(l._charges)}</td>
+                <td className={`px-2 py-2 text-right font-semibold ${l.status === 'overdue' ? 'text-red-600' : 'text-foreground'}`}>{formatINR(l._outstanding)}</td>
+                <td className={`px-2 py-2 text-right font-mono ${l._days > 7 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{l._days}</td>
+                <td className="px-2 py-2 text-right text-muted-foreground hidden md:table-cell">{l.rate ? `${l.rate}%` : '—'}</td>
               </tr>
-            </thead>
-            <tbody>
-              {openCases.length === 0 ? (
-                <tr><td colSpan={12} className="text-center py-10 text-muted-foreground">No open cases</td></tr>
-              ) : openCases.map((l, i) => (
-                <tr key={l.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => window.location.href=`/loans/${l.id}`}>
-                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM-yyyy') : '—'}</td>
-                  <td className="px-4 py-2.5 font-medium">{l.borrower_name}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{l.cluster || '—'}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{l.branch || '—'}</td>
-                  <td className="px-4 py-2.5 text-right font-semibold">{formatINR(l.principal)}</td>
-                  <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(l._charges)}</td>
-                  <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(l._gst)}</td>
-                  <td className={`px-4 py-2.5 text-right font-semibold ${l.status === 'overdue' ? 'text-red-600' : 'text-foreground'}`}>{formatINR(l._outstanding)}</td>
-                  <td className={`px-4 py-2.5 text-right font-mono text-xs ${l._days > 7 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{l._days}</td>
-                  <td className="px-4 py-2.5 text-right text-muted-foreground text-xs">{l.rate ? `${l.rate}%` : '—'}</td>
-                  <td className="px-4 py-2.5 text-center">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Follow Up!</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {openCases.length > 0 && (
-              <tfoot>
-                <tr className="bg-muted/60 border-t-2 border-border font-bold text-sm">
-                  <td colSpan={5} className="px-4 py-2.5">TOTAL ({openCases.length} cases)</td>
-                  <td className="px-4 py-2.5 text-right">{formatINR(openCases.reduce((s, l) => s + (l.principal||0), 0))}</td>
-                  <td className="px-4 py-2.5 text-right">{formatINR(openCases.reduce((s, l) => s + l._charges, 0))}</td>
-                  <td className="px-4 py-2.5 text-right">{formatINR(openCases.reduce((s, l) => s + l._gst, 0))}</td>
-                  <td className="px-4 py-2.5 text-right">{formatINR(openCases.reduce((s, l) => s + l._outstanding, 0))}</td>
-                  <td colSpan={3} />
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
+            ))}
+          </tbody>
+          {openCases.length > 0 && (
+            <tfoot>
+              <tr className="bg-muted/60 border-t-2 border-border font-bold text-xs">
+                <td colSpan={4} className="px-2 py-2">TOTAL ({openCases.length} cases)</td>
+                <td className="px-2 py-2 text-right">{formatINR(openCases.reduce((s, l) => s + (l.principal||0), 0))}</td>
+                <td className="px-2 py-2 text-right">{formatINR(openCases.reduce((s, l) => s + l._charges, 0))}</td>
+                <td className="px-2 py-2 text-right">{formatINR(openCases.reduce((s, l) => s + l._outstanding, 0))}</td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
+          )}
+        </table>
       </div>
 
       {/* ── Section 4: Cluster Summary ── */}
@@ -311,39 +294,34 @@ export default function Dashboard() {
         <div className="px-5 py-4 border-b border-border">
           <h3 className="font-syne font-semibold text-sm">Cluster Summary</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
-                <th className="text-left px-4 py-2.5 font-medium">Cluster</th>
-                <th className="text-right px-4 py-2.5 font-medium">Cases</th>
-                <th className="text-right px-4 py-2.5 font-medium">Principal</th>
-                <th className="text-right px-4 py-2.5 font-medium">Charges</th>
-                <th className="text-right px-4 py-2.5 font-medium">GST</th>
-                <th className="text-right px-4 py-2.5 font-medium">Outstanding</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clusters.filter(c => c.cases > 0 && openLoans.some(l => (l.cluster||'Other') === c.cluster)).map(c => {
-                const openInCluster = openLoans.filter(l => (l.cluster||'Other') === c.cluster);
-                const principal = openInCluster.reduce((s,l) => s+(l.principal||0), 0);
-                const charges = openInCluster.reduce((s,l) => s+calcCharges(l), 0);
-                const gst = openInCluster.reduce((s,l) => s+(l.gst!=null?l.gst:calcGST(calcCharges(l))), 0);
-                const outstanding = openInCluster.reduce((s,l) => s+calcOutstanding(l), 0);
-                return (
-                  <tr key={c.cluster} className="border-t border-border hover:bg-muted/30">
-                    <td className="px-4 py-2.5 font-medium">{c.cluster}</td>
-                    <td className="px-4 py-2.5 text-right">{openInCluster.length}</td>
-                    <td className="px-4 py-2.5 text-right">{formatINR(principal)}</td>
-                    <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(charges)}</td>
-                    <td className="px-4 py-2.5 text-right text-muted-foreground">{formatINR(gst)}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-primary">{formatINR(outstanding)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-muted/40 text-muted-foreground uppercase tracking-wide">
+              <th className="text-left px-3 py-2 font-medium">Cluster</th>
+              <th className="text-right px-3 py-2 font-medium">Cases</th>
+              <th className="text-right px-3 py-2 font-medium">Principal</th>
+              <th className="text-right px-3 py-2 font-medium">Charges</th>
+              <th className="text-right px-3 py-2 font-medium">Outstanding</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clusters.filter(c => c.cases > 0 && openLoans.some(l => (l.cluster||'Other') === c.cluster)).map(c => {
+              const openInCluster = openLoans.filter(l => (l.cluster||'Other') === c.cluster);
+              const principal = openInCluster.reduce((s,l) => s+(l.principal||0), 0);
+              const charges = openInCluster.reduce((s,l) => s+calcCharges(l), 0);
+              const outstanding = openInCluster.reduce((s,l) => s+calcOutstanding(l), 0);
+              return (
+                <tr key={c.cluster} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-3 py-2 font-medium">{c.cluster}</td>
+                  <td className="px-3 py-2 text-right">{openInCluster.length}</td>
+                  <td className="px-3 py-2 text-right">{formatINR(principal)}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{formatINR(charges)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-primary">{formatINR(outstanding)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       {/* ── Section 5: Cluster Analytics YTD + Month-wise ── */}
@@ -353,16 +331,16 @@ export default function Dashboard() {
           <div className="px-5 py-4 border-b border-border">
             <h3 className="font-syne font-semibold text-sm">Cluster Analytics — YTD</h3>
           </div>
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase">
-                <th className="text-left px-4 py-2 font-medium">Cluster</th>
-                <th className="text-right px-4 py-2 font-medium">Cases</th>
-                <th className="text-right px-4 py-2 font-medium">Closed</th>
-                <th className="text-right px-4 py-2 font-medium">Volume</th>
-                <th className="text-right px-4 py-2 font-medium">Charges</th>
-                <th className="text-right px-4 py-2 font-medium">Avg TAT</th>
-                <th className="text-right px-4 py-2 font-medium">ROI%</th>
+              <tr className="bg-muted/40 text-muted-foreground uppercase">
+                <th className="text-left px-3 py-2 font-medium">Cluster</th>
+                <th className="text-right px-3 py-2 font-medium">Cases</th>
+                <th className="text-right px-3 py-2 font-medium">Cl.</th>
+                <th className="text-right px-3 py-2 font-medium">Volume</th>
+                <th className="text-right px-3 py-2 font-medium">Charges</th>
+                <th className="text-right px-3 py-2 font-medium">TAT</th>
+                <th className="text-right px-3 py-2 font-medium">ROI%</th>
               </tr>
             </thead>
             <tbody>
@@ -371,15 +349,15 @@ export default function Dashboard() {
                 const roi = calcROI(c.principal, c.charges);
                 return (
                   <tr key={c.cluster} className="border-t border-border">
-                    <td className="px-4 py-2.5 font-medium">
-                      <span className="text-xs text-muted-foreground mr-2">#{i+1}</span>{c.cluster}
+                    <td className="px-3 py-2 font-medium">
+                      <span className="text-muted-foreground mr-1">#{i+1}</span>{c.cluster}
                     </td>
-                    <td className="px-4 py-2.5 text-right">{c.cases}</td>
-                    <td className="px-4 py-2.5 text-right text-green-600 font-medium">{c.closed}</td>
-                    <td className="px-4 py-2.5 text-right">{formatINR(c.principal)}</td>
-                    <td className="px-4 py-2.5 text-right text-primary font-semibold">{formatINR(c.charges)}</td>
-                    <td className={`px-4 py-2.5 text-right text-xs font-mono ${tat && parseFloat(tat) > 1.5 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{tat ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-right text-xs font-semibold text-primary">{roi.toFixed(3)}%</td>
+                    <td className="px-3 py-2 text-right">{c.cases}</td>
+                    <td className="px-3 py-2 text-right text-green-600 font-medium">{c.closed}</td>
+                    <td className="px-3 py-2 text-right">{formatINR(c.principal)}</td>
+                    <td className="px-3 py-2 text-right text-primary font-semibold">{formatINR(c.charges)}</td>
+                    <td className={`px-3 py-2 text-right font-mono ${tat && parseFloat(tat) > 1.5 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{tat ?? '—'}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-primary">{roi.toFixed(2)}%</td>
                   </tr>
                 );
               })}

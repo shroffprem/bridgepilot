@@ -155,9 +155,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-0 divide-x divide-y md:divide-y-0 divide-border">
           {[
             { label: 'Cases Disbursed', value: active.cases, sub: `${active.open} open · ${active.closed} closed` },
-            { label: 'Volume Disbursed', value: formatINR(active.volume), sub: 'Principal', accent: true },
+            { label: 'Total Disbursed', value: formatINRFull(active.volume), sub: 'Principal', accent: true },
             { label: 'Charges Earned', value: formatINR(active.charges), sub: `+ ${formatINR(active.gst)} GST`, accent: true },
-            { label: 'Outstanding', value: formatINR(active.outstanding), sub: 'Active cases' },
+            { label: 'Outstanding', value: formatINRFull(active.outstanding), sub: 'Active cases' },
           ].map(({ label, value, sub, accent }) => (
             <div key={label} className={`p-4 ${accent ? 'bg-accent/20' : ''}`}>
               <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</div>

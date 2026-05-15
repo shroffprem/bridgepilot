@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { format, differenceInDays } from 'date-fns';
+import { Loader2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell
@@ -77,12 +78,22 @@ export default function Reports() {
 
   const downloadReport = async (reportType) => {
     setDownloading(reportType);
-    const res = await base44.functions.invoke('generateReportPDF', { reportType });
-    if (res.data?.pdf_url) {
-      const link = document.createElement('a');
-      link.href = res.data.pdf_url;
-      link.download = `bridgeline-${reportType}.pdf`;
-      link.click();
+    try {
+      const res = await base44.functions.invoke('generateConsolidatedMIS', {});
+      if (res && res.data) {
+        // Create blob from response
+        const blob = new Blob([res.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `BridgeLine-MIS-${format(new Date(), 'yyyyMMdd')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error('Download failed:', err);
     }
     setDownloading(null);
   };
@@ -223,19 +234,11 @@ export default function Reports() {
               size="sm"
               variant="outline"
               className="gap-2"
-              onClick={() => downloadReport('daily_mis')}
-              disabled={downloading === 'daily_mis'}
+              onClick={() => downloadReport('consolidated_mis')}
+              disabled={downloading}
             >
-              <Download size={14} /> {downloading === 'daily_mis' ? 'Generating...' : 'Daily MIS'}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2"
-              onClick={() => downloadReport('cluster_performance')}
-              disabled={downloading === 'cluster_performance'}
-            >
-              <Download size={14} /> {downloading === 'cluster_performance' ? 'Generating...' : 'Cluster Performance'}
+              {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {downloading ? 'Generating...' : 'Download MIS Report'}
             </Button>
           </div>
         </div>

@@ -29,7 +29,21 @@ const STATUS_LABELS = {
   closed: 'Closed',
   overdue: 'Overdue',
   rejected: 'Rejected',
+  follow_up: 'Open',
 };
+
+// Normalize status values
+function normalizeStatus(status) {
+  if (!status) return 'open';
+  if (status === 'Follow Up!' || status === 'follow_up') return 'open';
+  if (status === 'open' || status === 'Open') return 'open';
+  if (status === 'closed' || status === 'Closed') return 'closed';
+  if (status === 'overdue' || status === 'Overdue') return 'overdue';
+  if (status === 'pending_cluster_approval') return 'pending_cluster_approval';
+  if (status === 'pending_zonal_approval') return 'pending_zonal_approval';
+  if (status === 'rejected' || status === 'Rejected') return 'rejected';
+  return 'open';
+}
 const STATUS_STYLES = {
   pending_cluster_approval: 'bg-blue-100 text-blue-800',
   pending_zonal_approval: 'bg-orange-100 text-orange-800',
@@ -59,6 +73,9 @@ export default function LoanDetail() {
       base44.entities.Loan.filter({ id }),
       base44.entities.Collection.filter({ loan_id: id }),
     ]);
+    if (l) {
+      l.status = normalizeStatus(l.status);
+    }
     setLoan(l);
     setCollections(cols.sort((a, b) => (a.credit_note_date > b.credit_note_date ? 1 : -1)));
     setLoading(false);

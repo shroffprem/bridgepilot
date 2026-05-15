@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
-import { format, endOfMonth, differenceInDays } from 'date-fns';
+import { format, endOfMonth, differenceInDays, getYear } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatINR, formatINRFull, calcCharges, calcGST, calcOutstanding, clusterSummary, monthlyBreakdown, calcROI, avgTAT } from '@/lib/mis';
-import { TrendingUp, Briefcase, IndianRupee, AlertCircle, Target, Clock } from 'lucide-react';
+import { Target } from 'lucide-react';
 import OverdueAgeing from '@/components/dashboard/OverdueAgeing';
 
 const MONTHLY_TARGET = 340000; // ₹3,40,000
@@ -27,53 +27,69 @@ export default function Dashboard() {
     base44.entities.Loan.list().then(l => { setLoans(l); setLoading(false); });
   }, []);
 
+  const [portfolioTab, setPortfolioTab] = useState('mtd');
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" /></div>;
 
   const today = new Date();
+  const currentYear = getYear(today);
+  const currentMonth = format(today, 'MMM yyyy');
+
   const openLoans = loans.filter(l => l.status === 'open' || l.status === 'overdue' || l.status === 'pending_approval');
   const closedLoans = loans.filter(l => l.status === 'closed');
   const overdueLoans = loans.filter(l => l.status === 'overdue');
 
-  const totalPrincipal = openLoans.reduce((s, l) => s + (l.principal || 0), 0);
-  const totalOutstanding = openLoans.reduce((s, l) => s + calcOutstanding(l), 0);
+  // MTD — disbursed this calendar month
+  const mtdLoans = loans.filter(l => l.disbursement_date && format(new Date(l.disbursement_date), 'MMM yyyy') === currentMonth);
+  // YTD — disbursed this calendar year
+  const ytdLoans = loans.filter(l => l.disbursement_date && getYear(new Date(l.disbursement_date)) === currentYear);
 
-  // MTD charges (current month disbursements)
-  const currentMonth = format(today, 'MMM yyyy');
-  const mtdLoans = loans.filter(l => {
-    if (!l.disbursement_date) return false;
-    return format(new Date(l.disbursement_date), 'MMM yyyy') === currentMonth;
-  });
-  const mtdCharges = mtdLoans.reduce((s, l) => s + calcCharges(l), 0);
+  function summaryOf(set) {
+    const volume = set.reduce((s, l) => s + (l.principal || 0), 0);
+    const charges = set.reduce((s, l) => s + calcCharges(l), 0);
+    const gst = set.reduce((s, l) => s + (l.gst != null ? l.gst : calcGST(calcCharges(l))), 0);
+    const outstanding = set.filter(l => l.status !== 'closed').reduce((s, l) => s + calcOutstanding(l), 0);
+    const collected = set.filter(l => l.status === 'closed').reduce((s, l) => s + (l.principal || 0) + calcCharges(l), 0);
+    const closed = set.filter(l => l.status === 'closed').length;
+    const open = set.filter(l => l.status === 'open' || l.status === 'overdue').length;
+    const roi = volume > 0 ? ((charges / volume) * 100).toFixed(3) : '0';
+    return { volume, charges, gst, outstanding, collected, closed, open, roi, cases: set.length };
+  }
 
-  // Portfolio totals
-  const allTimeVolume = loans.reduce((s, l) => s + (l.principal || 0), 0);
-  const allTimeCharges = loans.reduce((s, l) => s + calcCharges(l), 0);
+  const mtd = summaryOf(mtdLoans);
+  const ytd = summaryOf(ytdLoans);
+  const active = portfolioTab === 'mtd' ? mtd : ytd;
+  const activeLoans = portfolioTab === 'mtd' ? mtdLoans : ytdLoans;
 
-  // Capital deployed (approximate = sum of open principals)
-  const capitalDeployed = totalPrincipal;
-
-  // Available = assume total invested is a fixed pool; compute as allTimeVolume - totalOutstanding
-  // (user can configure total invested in future; for now show outstanding as deployed)
-
-  // Monthly goalpost
+  // Monthly goalpost (always MTD)
   const daysLeftInMonth = differenceInDays(endOfMonth(today), today) + 1;
-  const remaining = Math.max(0, MONTHLY_TARGET - mtdCharges);
-  const pctAchieved = Math.min(100, (mtdCharges / MONTHLY_TARGET) * 100);
+  const remaining = Math.max(0, MONTHLY_TARGET - mtd.charges);
+  const pctAchieved = Math.min(100, (mtd.charges / MONTHLY_TARGET) * 100);
   const dailyChargeNeeded = daysLeftInMonth > 0 ? remaining / daysLeftInMonth : 0;
 
-  // All-time ROI
+  // All-time
+  const allTimeVolume = loans.reduce((s, l) => s + (l.principal || 0), 0);
+  const allTimeCharges = loans.reduce((s, l) => s + calcCharges(l), 0);
   const allTimeROI = allTimeVolume > 0 ? ((allTimeCharges / allTimeVolume) * 100).toFixed(4) : '0';
 
   // Cluster summary
   const clusters = clusterSummary(loans);
 
-  // Monthly breakdown for chart
+  // Monthly breakdown for chart (always all-time for chart context)
   const monthly = monthlyBreakdown(loans);
   const chartData = monthly.map(m => ({
     month: m.month,
     Volume: Math.round(m.volume / 100000),
     Charges: Math.round(m.charges / 1000),
   }));
+
+  // Month-wise breakdown for active tab
+  const activeMonthly = portfolioTab === 'mtd'
+    ? monthly.filter(m => m.month === currentMonth)
+    : monthly.filter(m => {
+        const parts = m.month.split(' ');
+        return parts.length === 2 && parseInt(parts[1]) === currentYear;
+      });
 
   // Open cases table
   const openCases = openLoans.map(l => {
@@ -86,14 +102,108 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* ── Section 1: Portfolio KPIs ── */}
-      <div>
-        <h2 className="font-syne font-bold text-base text-muted-foreground uppercase tracking-wide mb-3">Portfolio Overview</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KPI label="Open Cases" value={openLoans.length} sub={`${overdueLoans.length} overdue`} />
-          <KPI label="Total Principal" value={formatINR(totalPrincipal)} sub="Open cases" accent />
-          <KPI label="Total Outstanding" value={formatINR(totalOutstanding)} sub="Incl. charges + GST" />
-          <KPI label="Net Charges (MTD)" value={formatINR(mtdCharges)} sub={`${mtdLoans.length} cases this month`} accent />
+      {/* ── Section 1: Portfolio Overview — MTD / YTD tabs ── */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        {/* Tab bar */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-0 border-b border-border">
+          <h2 className="font-syne font-bold text-sm text-foreground uppercase tracking-wide">Portfolio Overview</h2>
+          <div className="flex gap-0">
+            {[['mtd', `MTD — ${format(today, 'MMM yyyy')}`], ['ytd', `YTD — ${currentYear}`]].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setPortfolioTab(key)}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all ${
+                  portfolioTab === key
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* KPI row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-0 divide-x divide-y md:divide-y-0 divide-border">
+          {[
+            { label: 'Cases Disbursed', value: active.cases, sub: `${active.open} open · ${active.closed} closed` },
+            { label: 'Volume Disbursed', value: formatINR(active.volume), sub: 'Principal', accent: true },
+            { label: 'Charges Earned', value: formatINR(active.charges), sub: `+ ${formatINR(active.gst)} GST`, accent: true },
+            { label: 'Outstanding', value: formatINR(active.outstanding), sub: 'Active cases' },
+          ].map(({ label, value, sub, accent }) => (
+            <div key={label} className={`p-4 ${accent ? 'bg-accent/20' : ''}`}>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</div>
+              <div className="font-syne font-bold text-xl text-foreground">{value}</div>
+              {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+            </div>
+          ))}
+        </div>
+
+        {/* Month-wise table inside the tab */}
+        <div className="border-t border-border">
+          <div className="px-5 py-3 bg-muted/30">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {portfolioTab === 'mtd' ? `${format(today, 'MMMM yyyy')} Breakdown` : `${currentYear} — Month-wise Breakdown`}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
+                  {['Month', 'Cases', 'Volume', 'Charges', 'GST', 'Collected', 'Outstanding', 'Closed', 'Open', 'ROI%'].map(h => (
+                    <th key={h} className={`px-3 py-2 font-medium ${h === 'Month' ? 'text-left' : 'text-right'}`}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {activeMonthly.length === 0 ? (
+                  <tr><td colSpan={10} className="text-center py-6 text-muted-foreground text-sm">No data for this period</td></tr>
+                ) : activeMonthly.map(m => {
+                  const roi = m.volume > 0 ? ((m.charges / m.volume) * 100).toFixed(3) : '0';
+                  const isCurrent = m.month === currentMonth;
+                  return (
+                    <tr key={m.month} className={`border-t border-border ${isCurrent ? 'bg-accent/20 font-semibold' : 'hover:bg-muted/30'}`}>
+                      <td className="px-3 py-2.5">{m.month}</td>
+                      <td className="px-3 py-2.5 text-right">{m.cases}</td>
+                      <td className="px-3 py-2.5 text-right">{formatINR(m.volume)}</td>
+                      <td className="px-3 py-2.5 text-right text-primary font-semibold">{formatINR(m.charges)}</td>
+                      <td className="px-3 py-2.5 text-right text-muted-foreground">{formatINR(m.gst)}</td>
+                      <td className="px-3 py-2.5 text-right text-green-600">{formatINR(m.collected)}</td>
+                      <td className={`px-3 py-2.5 text-right ${m.outstanding > 0 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{formatINR(m.outstanding)}</td>
+                      <td className="px-3 py-2.5 text-right">{m.closed}</td>
+                      <td className="px-3 py-2.5 text-right">{m.open}</td>
+                      <td className="px-3 py-2.5 text-right text-xs font-semibold text-primary">{roi}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {activeMonthly.length > 1 && (() => {
+                const tot = activeMonthly.reduce((s, m) => ({
+                  cases: s.cases + m.cases, volume: s.volume + m.volume, charges: s.charges + m.charges,
+                  gst: s.gst + m.gst, collected: s.collected + m.collected, outstanding: s.outstanding + m.outstanding,
+                  closed: s.closed + m.closed, open: s.open + m.open,
+                }), { cases: 0, volume: 0, charges: 0, gst: 0, collected: 0, outstanding: 0, closed: 0, open: 0 });
+                const roi = tot.volume > 0 ? ((tot.charges / tot.volume) * 100).toFixed(3) : '0';
+                return (
+                  <tfoot>
+                    <tr className="border-t-2 border-border bg-muted/60 font-bold text-sm">
+                      <td className="px-3 py-2.5">TOTAL</td>
+                      <td className="px-3 py-2.5 text-right">{tot.cases}</td>
+                      <td className="px-3 py-2.5 text-right">{formatINR(tot.volume)}</td>
+                      <td className="px-3 py-2.5 text-right text-primary">{formatINR(tot.charges)}</td>
+                      <td className="px-3 py-2.5 text-right">{formatINR(tot.gst)}</td>
+                      <td className="px-3 py-2.5 text-right text-green-600">{formatINR(tot.collected)}</td>
+                      <td className="px-3 py-2.5 text-right text-red-600">{formatINR(tot.outstanding)}</td>
+                      <td className="px-3 py-2.5 text-right">{tot.closed}</td>
+                      <td className="px-3 py-2.5 text-right">{tot.open}</td>
+                      <td className="px-3 py-2.5 text-right text-primary">{roi}%</td>
+                    </tr>
+                  </tfoot>
+                );
+              })()}
+            </table>
+          </div>
         </div>
       </div>
 
@@ -111,8 +221,8 @@ export default function Dashboard() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
           {[
-            { label: 'Capital Deployed', value: formatINR(capitalDeployed) },
-            { label: 'Charges Earned', value: formatINR(mtdCharges) },
+            { label: 'Capital Deployed', value: formatINR(mtd.volume) },
+            { label: 'Charges Earned', value: formatINR(mtd.charges) },
             { label: 'Remaining', value: formatINR(remaining) },
             { label: 'Days Left', value: daysLeftInMonth },
             { label: 'Daily Charge Needed', value: formatINR(dailyChargeNeeded) },
@@ -291,83 +401,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Section 6: Portfolio Month-wise table ── */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
-          <h3 className="font-syne font-semibold text-sm">Portfolio Dashboard — Month-wise</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide">
-                {['Month','Cases','Volume','Charges','GST','Collected','Outstanding','Closed','Open','Avg TAT','ROI%'].map(h => (
-                  <th key={h} className={`px-3 py-2.5 font-medium ${h === 'Month' ? 'text-left' : 'text-right'}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {monthly.map(m => {
-                const isCurrentMonth = m.month === currentMonth;
-                const tat = m.tats.length ? (m.tats.reduce((s,t) => s+t, 0) / m.tats.length).toFixed(1) : '—';
-                const roi = m.volume > 0 ? ((m.charges / m.volume) * 100).toFixed(3) : '0';
-                return (
-                  <tr key={m.month} className={`border-t border-border ${isCurrentMonth ? 'bg-accent/30 font-semibold' : 'hover:bg-muted/30'}`}>
-                    <td className="px-3 py-2.5">{m.month}</td>
-                    <td className="px-3 py-2.5 text-right">{m.cases}</td>
-                    <td className="px-3 py-2.5 text-right">{formatINR(m.volume)}</td>
-                    <td className="px-3 py-2.5 text-right text-primary">{formatINR(m.charges)}</td>
-                    <td className="px-3 py-2.5 text-right text-muted-foreground">{formatINR(m.gst)}</td>
-                    <td className="px-3 py-2.5 text-right text-green-600">{formatINR(m.collected)}</td>
-                    <td className={`px-3 py-2.5 text-right ${m.outstanding > 0 ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>{formatINR(m.outstanding)}</td>
-                    <td className="px-3 py-2.5 text-right">{m.closed}</td>
-                    <td className="px-3 py-2.5 text-right">{m.open}</td>
-                    <td className={`px-3 py-2.5 text-right text-xs ${parseFloat(tat) > 1.5 ? 'text-red-600' : 'text-muted-foreground'}`}>{tat}</td>
-                    <td className="px-3 py-2.5 text-right text-xs font-semibold text-primary">{roi}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            {monthly.length > 0 && (() => {
-              const tot = monthly.reduce((s, m) => ({
-                cases: s.cases + m.cases, volume: s.volume + m.volume, charges: s.charges + m.charges,
-                gst: s.gst + m.gst, collected: s.collected + m.collected, outstanding: s.outstanding + m.outstanding,
-                closed: s.closed + m.closed, open: s.open + m.open,
-              }), { cases: 0, volume: 0, charges: 0, gst: 0, collected: 0, outstanding: 0, closed: 0, open: 0 });
-              const roi = tot.volume > 0 ? ((tot.charges / tot.volume) * 100).toFixed(3) : '0';
-              return (
-                <tfoot>
-                  <tr className="border-t-2 border-border bg-muted/60 font-bold text-sm">
-                    <td className="px-3 py-2.5">TOTAL</td>
-                    <td className="px-3 py-2.5 text-right">{tot.cases}</td>
-                    <td className="px-3 py-2.5 text-right">{formatINR(tot.volume)}</td>
-                    <td className="px-3 py-2.5 text-right text-primary">{formatINR(tot.charges)}</td>
-                    <td className="px-3 py-2.5 text-right">{formatINR(tot.gst)}</td>
-                    <td className="px-3 py-2.5 text-right text-green-600">{formatINR(tot.collected)}</td>
-                    <td className="px-3 py-2.5 text-right text-red-600">{formatINR(tot.outstanding)}</td>
-                    <td className="px-3 py-2.5 text-right">{tot.closed}</td>
-                    <td className="px-3 py-2.5 text-right">{tot.open}</td>
-                    <td className="px-3 py-2.5 text-right">—</td>
-                    <td className="px-3 py-2.5 text-right text-primary">{roi}%</td>
-                  </tr>
-                </tfoot>
-              );
-            })()}
-          </table>
-        </div>
-      </div>
 
-      {/* ── Section 7: All-time portfolio stats ── */}
-      <div className="bg-card rounded-xl border border-border p-5">
-        <h3 className="font-syne font-semibold text-sm mb-4">Portfolio Summary (All Time)</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KPI label="Total Disbursed (All Time)" value={formatINR(allTimeVolume)} />
-          <KPI label="Net Charges Earned" value={formatINR(allTimeCharges)} accent />
-          <KPI label="Total Pending Cases" value={openLoans.length} />
-          <KPI label="All-Time ROI" value={`${allTimeROI}%`} accent />
-          <KPI label="Total Overdue Cases" value={overdueLoans.length} />
-          <KPI label="Total Closed Cases" value={closedLoans.length} />
-        </div>
-      </div>
     </div>
   );
 }

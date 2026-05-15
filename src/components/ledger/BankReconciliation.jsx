@@ -34,38 +34,60 @@ function normaliseRef(s) {
   return String(s || '').replace(/\s+/g, '').toUpperCase();
 }
 
-// ── AI-powered CSV/XLSX parsing ───────────────────────────────────────────────
+// ── AI-powered parsing ────────────────────────────────────────────────────────
+
+const ROW_SCHEMA = {
+  type: 'object',
+  properties: {
+    rows: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          date:        { type: 'string', description: 'Transaction date in YYYY-MM-DD format' },
+          description: { type: 'string', description: 'Narration / description' },
+          debit:       { type: 'number', description: 'Amount debited (money going out). 0 if none.' },
+          credit:      { type: 'number', description: 'Amount credited (money coming in). 0 if none.' },
+          reference:   { type: 'string', description: 'UTR / cheque no / reference number if present' },
+          balance:     { type: 'number', description: 'Closing balance after this transaction, if present. 0 if absent.' },
+        },
+        required: ['date', 'description', 'debit', 'credit']
+      }
+    }
+  },
+  required: ['rows']
+};
 
 async function extractBankRows(file) {
   const { file_url } = await base44.integrations.Core.UploadFile({ file });
+  const isPdf = file.name.toLowerCase().endsWith('.pdf');
 
-  const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-    file_url,
-    json_schema: {
-      type: 'object',
-      properties: {
-        rows: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              date:        { type: 'string', description: 'Transaction date in YYYY-MM-DD format' },
-              description: { type: 'string', description: 'Narration / description' },
-              debit:       { type: 'number', description: 'Amount debited (money going out). 0 if none.' },
-              credit:      { type: 'number', description: 'Amount credited (money coming in). 0 if none.' },
-              reference:   { type: 'string', description: 'UTR / cheque no / reference number if present' },
-              balance:     { type: 'number', description: 'Closing balance after this transaction, if present. 0 if absent.' },
-            },
-            required: ['date', 'description', 'debit', 'credit']
-          }
-        }
-      },
-      required: ['rows']
-    }
-  });
+  if (isPdf) {
+    // Use InvokeLLM with file_urls — handles PDFs via vision model
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt: `This is a bank statement PDF. Extract ALL transactions from it into a structured list.
+For each transaction row return:
+- date: in YYYY-MM-DD format
+- description: narration / merchant name
+- debit: amount debited/withdrawn (number, 0 if none)
+- credit: amount credited/deposited (number, 0 if none)
+- reference: UTR / cheque number / reference ID (empty string if absent)
+- balance: closing balance after this row (0 if not shown)
 
-  if (result.status !== 'success') throw new Error(result.details || 'Could not parse file');
-  return result.output.rows || [];
+Return ONLY the JSON object with a "rows" array. Do not include any other text.`,
+      file_urls: [file_url],
+      response_json_schema: ROW_SCHEMA,
+    });
+    return result.rows || [];
+  } else {
+    // CSV / XLSX — use the structured extractor
+    const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
+      file_url,
+      json_schema: ROW_SCHEMA,
+    });
+    if (result.status !== 'success') throw new Error(result.details || 'Could not parse file');
+    return result.output.rows || [];
+  }
 }
 
 // ── reconciliation logic ──────────────────────────────────────────────────────
@@ -168,7 +190,7 @@ export default function BankReconciliation({ disbursals, collections }) {
 
         <div className="flex items-start gap-2 bg-accent/40 border border-accent rounded-lg px-3 py-2.5 text-xs text-accent-foreground">
           <Info size={14} className="mt-0.5 shrink-0" />
-          <span>Upload any CSV or Excel bank statement. The AI will auto-detect columns for Date, Debit, Credit, and Reference and match them against your disbursals and collections.</span>
+          <span>Upload a CSV, Excel, or PDF bank statement. The AI will auto-detect columns for Date, Debit, Credit, and Reference and match them against your disbursals and collections.</span>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 items-start">

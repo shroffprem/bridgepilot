@@ -12,16 +12,21 @@
       ],
       "default": "branch_manager"
     },
+    "phone": {
+      "type": "string",
+      "description": "Mobile number for WhatsApp notifications (10 digits, India)"
+    },
     "branch": {
       "type": "string",
-      "description": "Branch this user manages (for branch_manager role)"
+      "description": "Branch this user is assigned to"
     },
     "cluster": {
       "type": "string",
-      "description": "Cluster this user manages (for cluster_manager role)"
+      "description": "Cluster this user is assigned to"
     },
-    "phone": {
-      "type": "string"
+    "zone": {
+      "type": "string",
+      "description": "Zone this user is assigned to"
     }
   }
 }

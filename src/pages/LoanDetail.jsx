@@ -122,13 +122,13 @@ export default function LoanDetail() {
           <div className="text-sm text-muted-foreground font-mono">{loan.loan_number} {loan.disbursal_id && `· ${loan.disbursal_id}`} {loan.branch && `· ${loan.branch}`} {loan.cluster && `· ${loan.cluster}`}</div>
         </div>
         <div className="flex gap-2 flex-wrap">
-           {/* Disbursal recording — available once approved (open/overdue/follow_up) */}
-           {['open', 'overdue', 'follow_up'].includes(loan.status) && (
+           {/* Disbursal recording — available for active cases */}
+           {['pending_cluster_approval', 'pending_zonal_approval', 'open', 'overdue', 'follow_up'].includes(loan.status) && (
              <Button size="sm" variant="outline" className="gap-1" onClick={() => setDisbursalOpen(true)}>
                <Banknote size={14} /> Debit Note
              </Button>
            )}
-           {['open', 'follow_up'].includes(loan.status) && (
+           {['pending_cluster_approval', 'pending_zonal_approval', 'open', 'follow_up'].includes(loan.status) && (
              <>
                <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCollectionOpen(true)}><BadgeCheck size={14} /> Credit Note</Button>
                <Button size="sm" variant="destructive" className="gap-1" onClick={() => setConfirmOverdue(true)}><AlertTriangle size={14} /> Mark Overdue</Button>
@@ -283,7 +283,7 @@ export default function LoanDetail() {
       )}
 
       {/* Memos */}
-      {['open', 'closed', 'overdue', 'follow_up'].includes(loan.status) && (
+      {['pending_cluster_approval', 'pending_zonal_approval', 'open', 'closed', 'overdue', 'follow_up'].includes(loan.status) && (
         <div className="bg-card rounded-xl border border-border p-5">
           <h3 className="font-syne font-semibold text-sm mb-4 flex items-center gap-2">
             <FileText size={15} className="text-primary" /> Memos

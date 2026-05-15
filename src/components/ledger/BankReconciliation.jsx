@@ -177,8 +177,8 @@ export default function BankReconciliation({ disbursals, collections }) {
             <span className="text-sm text-center">
               {file ? file.name : 'Click to upload CSV / Excel bank statement'}
             </span>
-            <span className="text-xs text-muted-foreground">.csv, .xlsx, .xls supported</span>
-            <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFile} />
+            <span className="text-xs text-muted-foreground">.csv, .xlsx, .xls, .pdf supported</span>
+            <input type="file" accept=".csv,.xlsx,.xls,.pdf" className="hidden" onChange={handleFile} />
           </label>
 
           <Button onClick={handleReconcile} disabled={!file || loading} className="gap-2 sm:self-end">

@@ -1,0 +1,38 @@
+{
+  "name": "CapitalEntry",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "addition",
+        "withdrawal"
+      ],
+      "description": "Whether capital was added or withdrawn"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Amount in \u20b9"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of the capital change"
+    },
+    "source": {
+      "type": "string",
+      "description": "Source / partner name (e.g. Partner A, Bank OD)"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "recorded_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "amount",
+    "date"
+  ]
+}

@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, ShieldCheck, User } from 'lucide-react';
+import { UserPlus, ShieldCheck, User, TrendingUp, MessageSquare, Upload, Settings } from 'lucide-react';
 import LoanCsvImport from '@/components/admin/LoanCsvImport';
 import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
+import CapitalManager from '@/components/admin/CapitalManager';
 
 const ROLE_LABELS = {
   admin: 'Admin',
@@ -22,7 +23,15 @@ const ROLE_STYLES = {
   zonal_manager: 'bg-orange-100 text-orange-800',
 };
 
+const TABS = [
+  { key: 'users', label: 'Users', icon: ShieldCheck },
+  { key: 'capital', label: 'Capital', icon: TrendingUp },
+  { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
+  { key: 'import', label: 'Import', icon: Upload },
+];
+
 export default function Admin() {
+  const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
@@ -68,18 +77,32 @@ export default function Admin() {
   const showCluster = role === 'cluster_manager' || role === 'branch_manager';
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-6 max-w-5xl">
       <div>
         <h2 className="font-syne font-bold text-xl text-foreground">Admin Panel</h2>
-        <p className="text-sm text-muted-foreground mt-1">Manage user access and roles for BridgeLine Partners.</p>
+        <p className="text-sm text-muted-foreground mt-1">Manage users, capital, and system settings.</p>
       </div>
 
-      {/* WhatsApp Notifications */}
-      <WhatsAppSettings />
+      {/* Tab Bar */}
+      <div className="flex gap-1 border-b border-border">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${
+              activeTab === key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Icon size={14} />{label}
+          </button>
+        ))}
+      </div>
 
-      {/* Bulk CSV Import */}
-      <LoanCsvImport />
+      {activeTab === 'capital' && <CapitalManager />}
+      {activeTab === 'whatsapp' && <WhatsAppSettings />}
+      {activeTab === 'import' && <LoanCsvImport />}
 
+      {activeTab === 'users' && <div className="space-y-6">
       {/* Invite User */}
       <div className="bg-card rounded-xl border border-border p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -197,6 +220,7 @@ export default function Admin() {
           </div>
         )}
       </div>
+      </div>}
     </div>
   );
 }

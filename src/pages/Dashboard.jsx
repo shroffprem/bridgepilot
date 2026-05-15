@@ -7,7 +7,6 @@ import { formatINR, formatINRFull, calcCharges, calcGST, calcOutstanding, cluste
 import { Target } from 'lucide-react';
 import OverdueAgeing from '@/components/dashboard/OverdueAgeing';
 
-const MONTHLY_TARGET = 340000; // ₹3,40,000
 
 function KPI({ label, value, sub, accent }) {
   return (
@@ -21,10 +20,14 @@ function KPI({ label, value, sub, accent }) {
 
 export default function Dashboard() {
   const [loans, setLoans] = useState([]);
+  const [capitalEntries, setCapitalEntries] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    base44.entities.Loan.list().then(l => { setLoans(l); setLoading(false); });
+    Promise.all([
+      base44.entities.Loan.list(),
+      base44.entities.CapitalEntry.list(),
+    ]).then(([l, c]) => { setLoans(l); setCapitalEntries(c); setLoading(false); });
   }, []);
 
   const [portfolioTab, setPortfolioTab] = useState('mtd');
@@ -61,16 +64,18 @@ export default function Dashboard() {
   const active = portfolioTab === 'mtd' ? mtd : ytd;
   const activeLoans = portfolioTab === 'mtd' ? mtdLoans : ytdLoans;
 
-  // Monthly goalpost (always MTD)
+  // Monthly goalpost — target is 4% of capital deployed
+  const monthlyTarget = capitalDeployed * 0.04;
   const daysLeftInMonth = differenceInDays(endOfMonth(today), today) + 1;
-  const remaining = Math.max(0, MONTHLY_TARGET - mtd.charges);
-  const pctAchieved = Math.min(100, (mtd.charges / MONTHLY_TARGET) * 100);
+  const remaining = Math.max(0, monthlyTarget - mtd.charges);
+  const pctAchieved = monthlyTarget > 0 ? Math.min(100, (mtd.charges / monthlyTarget) * 100) : 0;
   const dailyChargeNeeded = daysLeftInMonth > 0 ? remaining / daysLeftInMonth : 0;
 
+  // Capital deployed (live from CapitalEntry records)
+  const capitalDeployed = capitalEntries.reduce((s, e) => e.type === 'addition' ? s + e.amount : s - e.amount, 0);
+
   // All-time
-  const allTimeVolume = loans.reduce((s, l) => s + (l.principal || 0), 0);
   const allTimeCharges = loans.reduce((s, l) => s + calcCharges(l), 0);
-  const allTimeROI = allTimeVolume > 0 ? ((allTimeCharges / allTimeVolume) * 100).toFixed(4) : '0';
 
   // Cluster summary
   const clusters = clusterSummary(loans);
@@ -212,7 +217,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Target size={16} className="text-primary" />
-            <h3 className="font-syne font-semibold text-sm">Monthly ROI Goalpost — {format(today, 'MMM yyyy')} <span className="text-muted-foreground font-normal">(Target: 4.00%)</span></h3>
+            <h3 className="font-syne font-semibold text-sm">Monthly ROI Goalpost — {format(today, 'MMM yyyy')} <span className="text-muted-foreground font-normal">(4% of {formatINR(capitalDeployed)} deployed)</span></h3>
           </div>
           <span className="text-sm font-semibold text-primary">{pctAchieved.toFixed(1)}% achieved</span>
         </div>
@@ -221,12 +226,12 @@ export default function Dashboard() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
           {[
-            { label: 'Capital Deployed', value: formatINR(mtd.volume) },
+            { label: 'Capital Deployed', value: formatINR(capitalDeployed) },
             { label: 'Charges Earned', value: formatINR(mtd.charges) },
             { label: 'Remaining', value: formatINR(remaining) },
             { label: 'Days Left', value: daysLeftInMonth },
             { label: 'Daily Charge Needed', value: formatINR(dailyChargeNeeded) },
-            { label: 'Target', value: formatINR(MONTHLY_TARGET) },
+            { label: 'Target (4%)', value: formatINR(monthlyTarget) },
           ].map(({ label, value }) => (
             <div key={label} className="bg-muted/50 rounded-lg p-3">
               <div className="text-xs text-muted-foreground mb-1">{label}</div>

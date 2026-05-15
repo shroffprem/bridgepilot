@@ -37,7 +37,22 @@ function fmtDate(d) {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function buildPDF(loan, collection) {
+const LOGO_URL = 'https://media.base44.com/images/public/6a056f02e19305d21d34b219/fa91ede9e_BLPLogo.png';
+
+async function fetchLogoBase64() {
+  try {
+    const res = await fetch(LOGO_URL);
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return 'data:image/png;base64,' + btoa(binary);
+  } catch {
+    return null;
+  }
+}
+
+function buildPDF(loan, collection, logoBase64) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = 210, pageH = 297;
   const margin = 14;
@@ -55,15 +70,25 @@ function buildPDF(loan, collection) {
   doc.setFillColor(31, 40, 70);
   doc.rect(0, 0, W, 38, 'F');
 
-  // Company name text (logo placeholder)
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('BridgeLine Partners', margin, 14);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text(isClosed ? 'COLLECTION MEMO' : 'DISBURSEMENT MEMO', margin, 22);
+  // Logo or company name fallback
+  if (logoBase64) {
+    doc.addImage(logoBase64, 'PNG', margin, 5, 28, 28);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('BridgeLine Partners', margin + 31, 16);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(isClosed ? 'COLLECTION MEMO' : 'DISBURSEMENT MEMO', margin + 31, 23);
+  } else {
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('BridgeLine Partners', margin, 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(isClosed ? 'COLLECTION MEMO' : 'DISBURSEMENT MEMO', margin, 22);
+  }
 
   doc.setFontSize(7);
   doc.setTextColor(200, 210, 255);
@@ -354,8 +379,9 @@ Deno.serve(async (req) => {
     if (cols.length > 0) collection = cols[0];
   }
 
-  // Build PDF
-  const pdfBytes = buildPDF(loan, collection);
+  // Fetch logo and build PDF
+  const logoBase64 = await fetchLogoBase64();
+  const pdfBytes = buildPDF(loan, collection, logoBase64);
 
   // Upload PDF to get a public URL
   const blob = new Blob([pdfBytes], { type: 'application/pdf' });

@@ -63,7 +63,7 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
   const handleSave = async () => {
     setSaving(true);
     const me = await base44.auth.me();
-    await base44.entities.Collection.create({
+    const collectionRecord = await base44.entities.Collection.create({
       loan_id: loan.id,
       loan_number: loan.loan_number,
       borrower_name: loan.borrower_name,
@@ -83,6 +83,11 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
         closure_date: form.closure_date,
         outstanding: 0,
       });
+      // Send collection/closure memo via WhatsApp
+      base44.functions.invoke('generateMemo', {
+        loan_id: loan.id,
+        collection_id: collectionRecord?.id,
+      }).catch(() => {});
     }
     setSaving(false);
     onOpenChange(false);

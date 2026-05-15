@@ -44,6 +44,8 @@ export default function DisbursalDialog({ loan, open, onOpenChange, onSaved }) {
       ...form,
       recorded_by: me?.full_name || me?.email || '',
     });
+    // Send disbursement memo via WhatsApp
+    base44.functions.invoke('generateMemo', { loan_id: loan.id }).catch(() => {});
     setSaving(false);
     onOpenChange(false);
     onSaved?.();

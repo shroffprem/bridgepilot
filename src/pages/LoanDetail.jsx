@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Banknote, BadgeCheck, FileText, Download, Loader2, ArrowDownLeft } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Banknote, BadgeCheck, FileText, Download, Loader2, ArrowDownLeft, Pencil } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -67,6 +67,8 @@ export default function LoanDetail() {
   const [memoPdfs, setMemoPdfs] = useState({ disbursal: null, collection: null });
   const [confirmOverdue, setConfirmOverdue] = useState(false);
   const [confirmReopen, setConfirmReopen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editData, setEditData] = useState({});
 
   const load = async () => {
     const [[l], cols] = await Promise.all([
@@ -96,6 +98,27 @@ export default function LoanDetail() {
 
   const handleReopen = async () => {
     await base44.entities.Loan.update(id, { status: 'open', closure_date: null });
+    load();
+  };
+
+  const handleEditOpen = () => {
+    setEditData({
+      principal: loan.principal,
+      charges: loan.charges || calcCharges(loan),
+      gst: loan.gst != null ? loan.gst : calcGST(loan.charges || calcCharges(loan)),
+      rate: loan.rate || 0.5,
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    await base44.entities.Loan.update(id, {
+      principal: parseFloat(editData.principal) || 0,
+      charges: parseFloat(editData.charges) || 0,
+      gst: parseFloat(editData.gst) || 0,
+      rate: parseFloat(editData.rate) || 0.5,
+    });
+    setEditOpen(false);
     load();
   };
 
@@ -139,6 +162,7 @@ export default function LoanDetail() {
           <div className="text-sm text-muted-foreground font-mono">{loan.loan_number} {loan.disbursal_id && `· ${loan.disbursal_id}`} {loan.branch && `· ${loan.branch}`} {loan.cluster && `· ${loan.cluster}`}</div>
         </div>
         <div className="flex gap-2 flex-wrap">
+           <Button size="sm" variant="outline" className="gap-1" onClick={handleEditOpen}><Pencil size={14} /> Edit</Button>
            {/* Disbursal recording — available for active cases */}
            {['pending_cluster_approval', 'pending_zonal_approval', 'open', 'overdue'].includes(loan.status) && (
              <Button size="sm" variant="outline" className="gap-1" onClick={() => setDisbursalOpen(true)}>
@@ -388,6 +412,39 @@ export default function LoanDetail() {
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="outline" onClick={() => setCloseOpen(false)}>Cancel</Button>
             <Button onClick={handleClose}>Confirm Closure</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Case Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Case — {loan.borrower_name}</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Principal (₹)</Label>
+                <Input type="number" value={editData.principal} onChange={e => setEditData(p => ({ ...p, principal: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Rate (%)</Label>
+                <Input type="number" step="0.01" value={editData.rate} onChange={e => setEditData(p => ({ ...p, rate: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Charges (₹)</Label>
+                <Input type="number" value={editData.charges} onChange={e => setEditData(p => ({ ...p, charges: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>GST (₹)</Label>
+                <Input type="number" value={editData.gst} onChange={e => setEditData(p => ({ ...p, gst: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleEditSave}>Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>

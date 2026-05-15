@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Banknote, BadgeCheck } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Banknote, BadgeCheck, FileText, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,8 @@ export default function LoanDetail() {
   const [closureDate, setClosureDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [disbursalOpen, setDisbursalOpen] = useState(false);
   const [collectionOpen, setCollectionOpen] = useState(false);
+  const [memoLoading, setMemoLoading] = useState({ disbursal: false, collection: false });
+  const [memoPdfs, setMemoPdfs] = useState({ disbursal: null, collection: null });
 
   const load = async () => {
     const [l] = await base44.entities.Loan.filter({ id });
@@ -70,6 +72,21 @@ export default function LoanDetail() {
   const handleReopen = async () => {
     await base44.entities.Loan.update(id, { status: 'open', closure_date: null });
     load();
+  };
+
+  const generateMemoPDF = async (type) => {
+    setMemoLoading(p => ({ ...p, [type]: true }));
+    const payload = { loan_id: id };
+    if (type === 'collection') {
+      // fetch latest collection record for this loan
+      const cols = await base44.entities.Collection.filter({ loan_id: id });
+      if (cols.length > 0) payload.collection_id = cols[cols.length - 1].id;
+    }
+    const res = await base44.functions.invoke('generateMemo', payload);
+    if (res.data?.pdf_url) {
+      setMemoPdfs(p => ({ ...p, [type]: res.data.pdf_url }));
+    }
+    setMemoLoading(p => ({ ...p, [type]: false }));
   };
 
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" /></div>;
@@ -205,6 +222,56 @@ export default function LoanDetail() {
         <div className="bg-card rounded-xl border border-border p-5">
           <h3 className="font-syne font-semibold text-sm mb-4">Approval Trail</h3>
           <ApprovalTrail loan={loan} />
+        </div>
+      )}
+
+      {/* Memos */}
+      {['open', 'closed', 'overdue'].includes(loan.status) && (
+        <div className="bg-card rounded-xl border border-border p-5">
+          <h3 className="font-syne font-semibold text-sm mb-4 flex items-center gap-2">
+            <FileText size={15} className="text-primary" /> Memos
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            {/* Disbursement Memo */}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm" variant="outline" className="gap-2"
+                onClick={() => generateMemoPDF('disbursal')}
+                disabled={memoLoading.disbursal}
+              >
+                {memoLoading.disbursal ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                Disbursement Memo
+              </Button>
+              {memoPdfs.disbursal && (
+                <a href={memoPdfs.disbursal} target="_blank" rel="noreferrer">
+                  <Button size="sm" className="gap-2 bg-primary">
+                    <Download size={13} /> View PDF
+                  </Button>
+                </a>
+              )}
+            </div>
+
+            {/* Collection Memo — only if closed */}
+            {loan.status === 'closed' && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm" variant="outline" className="gap-2"
+                  onClick={() => generateMemoPDF('collection')}
+                  disabled={memoLoading.collection}
+                >
+                  {memoLoading.collection ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                  Collection Memo
+                </Button>
+                {memoPdfs.collection && (
+                  <a href={memoPdfs.collection} target="_blank" rel="noreferrer">
+                    <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700">
+                      <Download size={13} /> View PDF
+                    </Button>
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

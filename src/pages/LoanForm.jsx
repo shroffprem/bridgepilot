@@ -33,7 +33,7 @@ const EMPTY_FORM = {
   borrower_name: '',
   customer_mobile: '',
   principal: '',
-  rate: '',
+  rate: '0.5',
   charges: '',
   disbursement_date: format(new Date(), 'yyyy-MM-dd'),
   purpose: '',

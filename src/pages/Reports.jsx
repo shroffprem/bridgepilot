@@ -58,18 +58,34 @@ function SectionHeader({ title, sub }) {
 export default function Reports() {
   const [loans, setLoans] = useState([]);
   const [collections, setCollections] = useState([]);
+  const [disbursals, setDisbursals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(null);
 
   useEffect(() => {
     Promise.all([
       base44.entities.Loan.list(),
       base44.entities.Collection.list(),
-    ]).then(([l, c]) => {
+      base44.entities.Disbursal.list(),
+    ]).then(([l, c, d]) => {
       setLoans(l);
       setCollections(c);
+      setDisbursals(d);
       setLoading(false);
     });
   }, []);
+
+  const downloadReport = async (reportType) => {
+    setDownloading(reportType);
+    const res = await base44.functions.invoke('generateReportPDF', { reportType });
+    if (res.data?.pdf_url) {
+      const link = document.createElement('a');
+      link.href = res.data.pdf_url;
+      link.download = `bridgeline-${reportType}.pdf`;
+      link.click();
+    }
+    setDownloading(null);
+  };
 
   if (loading) return (
     <div className="flex justify-center py-20">
@@ -165,8 +181,65 @@ export default function Reports() {
     }).reduce((s, l) => s + (l.outstanding || 0), 0),
   }));
 
+  // Daily MIS calculations
+  const dailyData = {};
+  collections.forEach(c => {
+    const date = c.credit_note_date || format(new Date(), 'yyyy-MM-dd');
+    if (!dailyData[date]) dailyData[date] = { collections: [], disbursals: [], collAmt: 0, disbAmt: 0 };
+    dailyData[date].collections.push(c);
+    dailyData[date].collAmt += c.amount_collected || 0;
+  });
+  disbursals.forEach(d => {
+    const date = d.debit_note_date || format(new Date(), 'yyyy-MM-dd');
+    if (!dailyData[date]) dailyData[date] = { collections: [], disbursals: [], collAmt: 0, disbAmt: 0 };
+    dailyData[date].disbursals.push(d);
+    dailyData[date].disbAmt += d.principal || 0;
+  });
+
+  // Cluster-wise performance
+  const clusterMap = {};
+  loans.forEach(l => {
+    const cluster = l.cluster || 'Unassigned';
+    if (!clusterMap[cluster]) clusterMap[cluster] = { cluster, loans: [], principal: 0, charges: 0, closed: 0 };
+    clusterMap[cluster].loans.push(l);
+    clusterMap[cluster].principal += l.principal || 0;
+    clusterMap[cluster].charges += (l.charges != null ? l.charges : (l.principal || 0) * (l.rate || 0.5) / 100);
+    if (l.status === 'closed') clusterMap[cluster].closed++;
+  });
+  const clusterData = Object.values(clusterMap).sort((a, b) => b.principal - a.principal);
+
   return (
     <div className="space-y-8">
+
+      {/* ── Download Section ── */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-syne font-bold text-sm">Report Downloads</h3>
+            <p className="text-xs text-muted-foreground mt-1">Export data as PDF</p>
+          </div>
+          <div className="flex gap-2 flex-wrap justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => downloadReport('daily_mis')}
+              disabled={downloading === 'daily_mis'}
+            >
+              <Download size={14} /> {downloading === 'daily_mis' ? 'Generating...' : 'Daily MIS'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => downloadReport('cluster_performance')}
+              disabled={downloading === 'cluster_performance'}
+            >
+              <Download size={14} /> {downloading === 'cluster_performance' ? 'Generating...' : 'Cluster Performance'}
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {/* ── Portfolio KPIs ── */}
       <div>
@@ -367,6 +440,52 @@ export default function Reports() {
         )}
       </div>
 
-    </div>
-  );
-}
+      {/* ── Daily MIS ── */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <SectionHeader title="Daily MIS" sub="Collections and disbursals by date" />
+        {Object.keys(dailyData).length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">No activity logged yet</div>
+        ) : (
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {Object.entries(dailyData).sort(([a], [b]) => b.localeCompare(a)).map(([date, data]) => (
+              <div key={date} className="bg-muted/20 rounded-lg p-3 border border-border/50">
+                <div className="font-semibold text-sm mb-1">{date}</div>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="text-green-600"><span className="text-muted-foreground">Collections:</span> {formatINR(data.collAmt)} ({data.collections.length})</div>
+                  <div className="text-blue-600"><span className="text-muted-foreground">Disbursals:</span> {formatINR(data.disbAmt)} ({data.disbursals.length})</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Cluster-wise Performance ── */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <SectionHeader title="Cluster-wise Performance" sub="Detailed breakdown by cluster" />
+        {clusterData.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">No cluster data</div>
+        ) : (
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {clusterData.map(c => {
+              const openCount = c.loans.filter(l => l.status === 'open' || l.status === 'overdue').length;
+              const roi = c.principal > 0 ? ((c.charges / c.principal) * 100).toFixed(2) : '0';
+              return (
+                <div key={c.cluster} className="bg-muted/20 rounded-lg p-3 border border-border/50">
+                  <div className="font-semibold text-sm mb-2">{c.cluster}</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div><span className="text-muted-foreground">Cases:</span> {c.loans.length}</div>
+                    <div><span className="text-muted-foreground">Open:</span> {openCount} | <span className="text-muted-foreground">Closed:</span> {c.closed}</div>
+                    <div><span className="text-muted-foreground">Principal:</span> {formatINR(c.principal)}</div>
+                    <div><span className="text-muted-foreground">ROI:</span> {roi}%</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      </div>
+      );
+      }

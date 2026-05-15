@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Auto-generated disbursal ID (e.g. DIS-20240101-XXXX)"
     },
+    "disbursal_utr": {
+      "type": "string",
+      "description": "UTR/Reference number from bank debit note"
+    },
     "borrower_name": {
       "type": "string",
       "description": "Customer name"

@@ -146,7 +146,7 @@ function buildPDF(loan, collection, logoBase64) {
   doc.setTextColor(31, 40, 70);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('DISBURSED TO', margin + 2, y + 4.5);
+  doc.text('Disbursed to', margin + 2, y + 4.5);
 
   y += 9;
   doc.setFont('helvetica', 'normal');
@@ -158,12 +158,12 @@ function buildPDF(loan, collection, logoBase64) {
 
   const leftFields = [
     ['Customer:', loan.borrower_name || '-'],
-    ['Company:', loan.company || loan.so_name || '-'],
+    ['Company:', 'Hdb'],
     ['Cluster:', loan.cluster || '-'],
   ];
   const rightFields = [
     ['Branch:', loan.branch || '-'],
-    ['Chq / Ref:', loan.pledge_card_number || '-'],
+    ['Chq / Ref:', loan.disbursal_utr || loan.pledge_card_number || '-'],
     ['Debit Note:', loan.disbursal_id || '-'],
   ];
 
@@ -199,14 +199,14 @@ function buildPDF(loan, collection, logoBase64) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.text('DESCRIPTION', margin + 2, y + 5);
-  doc.text('AMOUNT', margin + halfW - 2, y + 5, { align: 'right' });
+  doc.text('Description', margin + 2, y + 5);
+  doc.text('Amount', margin + halfW - 2, y + 5, { align: 'right' });
 
   // Right header: COLLECTION DETAILS
   const cx = margin + halfW + 4;
   doc.setFillColor(31, 40, 70);
   doc.rect(cx, y, halfW, 7, 'F');
-  doc.text('COLLECTION DETAILS', cx + 2, y + 5);
+  doc.text('Collection details', cx + 2, y + 5);
 
   y += 9;
   doc.setFont('helvetica', 'normal');
@@ -214,17 +214,17 @@ function buildPDF(loan, collection, logoBase64) {
   doc.setTextColor(50, 50, 60);
 
   const descRows = [
-    ['Amount Disbursed', fmtINR(loan.principal), false],
-    ['Service Charges', fmtINR(charges), false],
-    ['GST (18%)', fmtINR(gst), false],
-    ['TOTAL PAYABLE', fmtINR(totalPayable), true],
+   ['Amount disbursed', fmtINR(loan.principal), false],
+   ['Service charges', fmtINR(charges), false],
+   ['GST (18%)', fmtINR(gst), false],
+   ['Total payable', fmtINR(totalPayable), true],
   ];
 
   const collRows = [
-    ['Collected Date', isClosed ? fmtDate(collection?.credit_note_date || loan.closure_date) : '-', false],
-    ['Collected Amount', isClosed ? fmtINR(collection?.amount_collected || totalPayable) : '-', false],
-    ['Balance O/S', fmtINR(outstanding), true],
-    ['Days Outstanding', String(days), false],
+   ['Collected date', isClosed ? fmtDate(collection?.credit_note_date || loan.closure_date) : '-', false],
+   ['Collected amount', isClosed ? fmtINR(collection?.amount_collected || totalPayable) : '-', false],
+   ['Balance O/S', fmtINR(outstanding), true],
+   ['Days outstanding', String(days), false],
   ];
 
   const rowH = 7;
@@ -313,7 +313,7 @@ function buildPDF(loan, collection, logoBase64) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(100, 100, 120);
-  doc.text('AUTHORISED BY', margin + 3, y + 6);
+  doc.text('Authorised by', margin + 3, y + 6);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(31, 40, 70);
@@ -322,7 +322,7 @@ function buildPDF(loan, collection, logoBase64) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(100, 100, 120);
-  doc.text('RECEIVED BY', margin + sigW + 15, y + 6);
+  doc.text('Received by', margin + sigW + 15, y + 6);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(31, 40, 70);

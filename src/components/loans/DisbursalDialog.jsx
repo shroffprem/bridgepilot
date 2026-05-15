@@ -31,6 +31,21 @@ export default function DisbursalDialog({ loan, open, onOpenChange, onSaved }) {
   const handleSave = async () => {
     setSaving(true);
     const me = await base44.auth.me();
+    
+    // Extract UTR from debit note image if available
+    let extractedUtr = form.debit_note_number;
+    if (form.debit_note_image_url && !extractedUtr) {
+      try {
+        const res = await base44.integrations.Core.InvokeLLM({
+          prompt: `Extract the UTR/Reference number from this bank debit note image. Return ONLY the UTR number, nothing else.`,
+          file_urls: [form.debit_note_image_url]
+        });
+        extractedUtr = res?.trim() || form.debit_note_number;
+      } catch (e) {
+        extractedUtr = form.debit_note_number;
+      }
+    }
+    
     await base44.entities.Disbursal.create({
       loan_id: loan.id,
       loan_number: loan.loan_number,
@@ -44,6 +59,12 @@ export default function DisbursalDialog({ loan, open, onOpenChange, onSaved }) {
       ...form,
       recorded_by: me?.full_name || me?.email || '',
     });
+    
+    // Update loan with extracted UTR
+    if (extractedUtr) {
+      await base44.entities.Loan.update(loan.id, { disbursal_utr: extractedUtr });
+    }
+    
     // Send disbursement memo via WhatsApp
     base44.functions.invoke('generateMemo', { loan_id: loan.id }).catch(() => {});
     setSaving(false);

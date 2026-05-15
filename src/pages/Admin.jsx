@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, ShieldCheck, User, TrendingUp, MessageSquare, Upload, Settings } from 'lucide-react';
+import { UserPlus, ShieldCheck, User, TrendingUp, MessageSquare, Upload, BookOpen } from 'lucide-react';
 import LoanCsvImport from '@/components/admin/LoanCsvImport';
 import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
 import CapitalManager from '@/components/admin/CapitalManager';
+import Ledger from '@/pages/Ledger';
 
 const ROLE_LABELS = {
   admin: 'Admin',
@@ -28,6 +29,7 @@ const TABS = [
   { key: 'capital', label: 'Capital', icon: TrendingUp },
   { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
   { key: 'import', label: 'Import', icon: Upload },
+  { key: 'ledger', label: 'Cash Ledger', icon: BookOpen },
 ];
 
 export default function Admin() {
@@ -101,6 +103,7 @@ export default function Admin() {
       {activeTab === 'capital' && <CapitalManager />}
       {activeTab === 'whatsapp' && <WhatsAppSettings />}
       {activeTab === 'import' && <LoanCsvImport />}
+      {activeTab === 'ledger' && <Ledger />}
 
       {activeTab === 'users' && <div className="space-y-6">
       {/* Invite User */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { formatINR } from '@/lib/mis';
@@ -45,6 +46,7 @@ export default function Ledger() {
         ref: d.debit_note_number || '—',
         branch: d.branch || '—',
         amount: d.principal || 0,
+        loan_id: d.loan_id || null,
         loan_number: d.loan_number || '—',
         note: d.notes || '',
       })),
@@ -55,6 +57,7 @@ export default function Ledger() {
         ref: c.credit_note_number || '—',
         branch: c.branch || '—',
         amount: c.amount_collected || 0,
+        loan_id: c.loan_id || null,
         loan_number: c.loan_number || '—',
         note: c.notes || '',
       })),
@@ -181,7 +184,13 @@ export default function Ledger() {
                           )}
                         </td>
                         <td className="px-4 py-2.5 font-medium">{e.label}</td>
-                        <td className="px-4 py-2.5 text-muted-foreground text-xs font-mono">{e.loan_number}</td>
+                        <td className="px-4 py-2.5 text-xs font-mono">
+                          {e.loan_id ? (
+                            <Link to={`/loans/${e.loan_id}`} className="text-primary hover:underline">{e.loan_number}</Link>
+                          ) : (
+                            <span className="text-muted-foreground">{e.loan_number}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2.5 text-muted-foreground text-xs font-mono">{e.ref}</td>
                         <td className="px-4 py-2.5 text-muted-foreground text-xs">{e.branch}</td>
                         <td className="px-4 py-2.5 text-right font-semibold text-red-600">

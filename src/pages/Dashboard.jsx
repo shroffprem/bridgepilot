@@ -26,14 +26,14 @@ export default function Dashboard() {
   // Normalize status values from Excel import
   function normalizeStatus(status) {
     if (!status) return 'pending_cluster_approval';
-    if (status === 'Follow Up!' || status === 'follow_up') return 'open';
+    if (status === 'Follow Up!') return 'follow_up';
     if (status === 'open' || status === 'Open') return 'open';
     if (status === 'closed' || status === 'Closed') return 'closed';
     if (status === 'overdue' || status === 'Overdue') return 'overdue';
     if (status === 'pending_cluster_approval') return 'pending_cluster_approval';
     if (status === 'pending_zonal_approval') return 'pending_zonal_approval';
     if (status === 'rejected' || status === 'Rejected') return 'rejected';
-    return 'open';
+    return 'follow_up';
   }
 
   useEffect(() => {

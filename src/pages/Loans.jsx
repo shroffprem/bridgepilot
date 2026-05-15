@@ -30,14 +30,14 @@ const STATUS_LABELS = {
 // Normalize status values from Excel import
 function normalizeStatus(status) {
   if (!status) return 'pending_cluster_approval';
-  if (status === 'Follow Up!' || status === 'follow_up') return 'open'; // Follow Up! shows in open cases
+  if (status === 'Follow Up!') return 'follow_up';
   if (status === 'open' || status === 'Open') return 'open';
   if (status === 'closed' || status === 'Closed') return 'closed';
   if (status === 'overdue' || status === 'Overdue') return 'overdue';
   if (status === 'pending_cluster_approval') return 'pending_cluster_approval';
   if (status === 'pending_zonal_approval') return 'pending_zonal_approval';
   if (status === 'rejected' || status === 'Rejected') return 'rejected';
-  return 'open'; // Default to open for unknown statuses
+  return 'follow_up';
 }
 
 export default function Loans() {
@@ -92,12 +92,6 @@ export default function Loans() {
     return acc;
   }, {});
 
-  // Combine follow_up count into open for display
-  if (statusCounts.follow_up) {
-    statusCounts.open = (statusCounts.open || 0) + statusCounts.follow_up;
-    delete statusCounts.follow_up;
-  }
-
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" />
@@ -124,7 +118,7 @@ export default function Loans() {
 
       {/* Status pills */}
       <div className="flex flex-wrap gap-2">
-        {[['all', 'All', loans.length], ...Object.entries(STATUS_LABELS).filter(([k]) => k !== 'follow_up').map(([k, v]) => [k, v, statusCounts[k] || 0])].map(([key, label, count]) => (
+        {[['all', 'All', loans.length], ...Object.entries(STATUS_LABELS).map(([k, v]) => [k, v, statusCounts[k] || 0])].map(([key, label, count]) => (
           <button
             key={key}
             onClick={() => setStatusFilter(key)}

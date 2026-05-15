@@ -5,6 +5,7 @@ import { format, endOfMonth, differenceInDays } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatINR, formatINRFull, calcCharges, calcGST, calcOutstanding, clusterSummary, monthlyBreakdown, calcROI, avgTAT } from '@/lib/mis';
 import { TrendingUp, Briefcase, IndianRupee, AlertCircle, Target, Clock } from 'lucide-react';
+import OverdueAgeing from '@/components/dashboard/OverdueAgeing';
 
 const MONTHLY_TARGET = 340000; // ₹3,40,000
 
@@ -124,6 +125,9 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* ── Overdue Ageing ── */}
+      <OverdueAgeing loans={loans} />
 
       {/* ── Section 3: Open Cases Table ── */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">

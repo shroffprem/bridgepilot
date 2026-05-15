@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Banknote, BadgeCheck, FileText, Download, Loader2 } from 'lucide-react';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,8 @@ export default function LoanDetail() {
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [memoLoading, setMemoLoading] = useState({ disbursal: false, collection: false });
   const [memoPdfs, setMemoPdfs] = useState({ disbursal: null, collection: null });
+  const [confirmOverdue, setConfirmOverdue] = useState(false);
+  const [confirmReopen, setConfirmReopen] = useState(false);
 
   const load = async () => {
     const [l] = await base44.entities.Loan.filter({ id });
@@ -123,14 +126,14 @@ export default function LoanDetail() {
           {loan.status === 'open' && (
             <>
               <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCollectionOpen(true)}><BadgeCheck size={14} /> Credit Note</Button>
-              <Button size="sm" variant="destructive" className="gap-1" onClick={handleMarkOverdue}><AlertTriangle size={14} /> Mark Overdue</Button>
+              <Button size="sm" variant="destructive" className="gap-1" onClick={() => setConfirmOverdue(true)}><AlertTriangle size={14} /> Mark Overdue</Button>
             </>
           )}
           {loan.status === 'overdue' && (
             <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCollectionOpen(true)}><BadgeCheck size={14} /> Credit Note</Button>
           )}
           {loan.status === 'closed' && (
-            <Button size="sm" variant="outline" onClick={handleReopen}>Re-open</Button>
+            <Button size="sm" variant="outline" onClick={() => setConfirmReopen(true)}>Re-open</Button>
           )}
         </div>
       </div>
@@ -275,6 +278,23 @@ export default function LoanDetail() {
         </div>
       )}
 
+      <ConfirmDialog
+        open={confirmOverdue}
+        onOpenChange={setConfirmOverdue}
+        title="Mark as Overdue?"
+        description={`This will flag the case for ${loan.borrower_name} as overdue. You can reverse this later.`}
+        confirmLabel="Mark Overdue"
+        confirmVariant="destructive"
+        onConfirm={() => { setConfirmOverdue(false); handleMarkOverdue(); }}
+      />
+      <ConfirmDialog
+        open={confirmReopen}
+        onOpenChange={setConfirmReopen}
+        title="Re-open this case?"
+        description="The loan will be marked as Open and the closure date will be cleared."
+        confirmLabel="Re-open"
+        onConfirm={() => { setConfirmReopen(false); handleReopen(); }}
+      />
       <DisbursalDialog loan={loan} open={disbursalOpen} onOpenChange={setDisbursalOpen} onSaved={load} />
       <CollectionDialog loan={loan} open={collectionOpen} onOpenChange={setCollectionOpen} onSaved={load} />
 

@@ -4,9 +4,10 @@ import { base44 } from '@/api/base44Client';
 import { format } from 'date-fns';
 import { formatINR, calcCharges, calcGST, calcOutstanding } from '@/lib/mis';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { Plus, Search, Filter, ChevronRight } from 'lucide-react';
+import { Plus, Search, ChevronRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_STYLES = {
   open: 'bg-blue-100 text-blue-800',
@@ -31,6 +32,10 @@ export default function Loans() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [clusterFilter, setClusterFilter] = useState('all');
+  const [soFilter, setSoFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const { user } = useCurrentUser();
 
   useEffect(() => {
@@ -42,16 +47,27 @@ export default function Loans() {
 
   const isAdmin = user?.role === 'admin';
 
+  const clusters = [...new Set(loans.map(l => l.cluster).filter(Boolean))].sort();
+  const soNames = [...new Set(loans.map(l => l.so_name).filter(Boolean))].sort();
+
   const filtered = loans.filter(l => {
     const matchStatus = statusFilter === 'all' || l.status === statusFilter;
+    const matchCluster = clusterFilter === 'all' || l.cluster === clusterFilter;
+    const matchSO = soFilter === 'all' || l.so_name === soFilter;
+    const matchDateFrom = !dateFrom || (l.disbursement_date && l.disbursement_date >= dateFrom);
+    const matchDateTo = !dateTo || (l.disbursement_date && l.disbursement_date <= dateTo);
     const q = search.toLowerCase();
     const matchSearch = !q ||
       (l.borrower_name || '').toLowerCase().includes(q) ||
       (l.loan_number || '').toLowerCase().includes(q) ||
       (l.branch || '').toLowerCase().includes(q) ||
-      (l.cluster || '').toLowerCase().includes(q);
-    return matchStatus && matchSearch;
+      (l.cluster || '').toLowerCase().includes(q) ||
+      (l.so_name || '').toLowerCase().includes(q);
+    return matchStatus && matchCluster && matchSO && matchDateFrom && matchDateTo && matchSearch;
   });
+
+  const hasFilters = clusterFilter !== 'all' || soFilter !== 'all' || dateFrom || dateTo;
+  const clearFilters = () => { setClusterFilter('all'); setSoFilter('all'); setDateFrom(''); setDateTo(''); };
 
   const statusCounts = loans.reduce((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
@@ -99,15 +115,45 @@ export default function Loans() {
         ))}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, loan #, branch, cluster…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      {/* Search + Filters */}
+      <div className="space-y-2">
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, loan #, branch, cluster, SO…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <Select value={clusterFilter} onValueChange={setClusterFilter}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue placeholder="Cluster" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Clusters</SelectItem>
+              {clusters.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={soFilter} onValueChange={setSoFilter}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue placeholder="SO Name" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All SOs</SelectItem>
+              {soNames.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-36 h-8 text-xs" placeholder="From date" />
+          <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-36 h-8 text-xs" placeholder="To date" />
+          {hasFilters && (
+            <button onClick={clearFilters} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <X size={12} /> Clear filters
+            </button>
+          )}
+          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} cases</span>
+        </div>
       </div>
 
       {/* Table — desktop */}

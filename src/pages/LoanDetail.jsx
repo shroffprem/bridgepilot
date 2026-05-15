@@ -128,7 +128,7 @@ export default function LoanDetail() {
               <Banknote size={14} /> Debit Note
             </Button>
           )}
-          {(loan.status === 'open' || loan.status === 'follow_up') && (
+          {loan.status === 'open' && (
             <>
               <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700" onClick={() => setCollectionOpen(true)}><BadgeCheck size={14} /> Credit Note</Button>
               <Button size="sm" variant="destructive" className="gap-1" onClick={() => setConfirmOverdue(true)}><AlertTriangle size={14} /> Mark Overdue</Button>

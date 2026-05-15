@@ -30,14 +30,14 @@ const STATUS_LABELS = {
 // Normalize status values from Excel import
 function normalizeStatus(status) {
   if (!status) return 'pending_cluster_approval';
-  if (status === 'Follow Up!') return 'follow_up';
+  if (status === 'Follow Up!' || status === 'follow_up') return 'open';
   if (status === 'open' || status === 'Open') return 'open';
   if (status === 'closed' || status === 'Closed') return 'closed';
   if (status === 'overdue' || status === 'Overdue') return 'overdue';
   if (status === 'pending_cluster_approval') return 'pending_cluster_approval';
   if (status === 'pending_zonal_approval') return 'pending_zonal_approval';
   if (status === 'rejected' || status === 'Rejected') return 'rejected';
-  return 'follow_up';
+  return 'open';
 }
 
 export default function Loans() {
@@ -119,7 +119,7 @@ export default function Loans() {
       {/* Status tabs */}
       <div className="border-b border-border">
         <div className="flex gap-6 overflow-x-auto">
-          {[['all', 'All'], ['open', 'Open'], ['overdue', 'Overdue'], ['follow_up', 'Follow Up'], ['closed', 'Closed'], ['pending_cluster_approval', 'Pending Cluster'], ['pending_zonal_approval', 'Pending Zonal'], ['rejected', 'Rejected']].map(([key, label]) => (
+          {[['all', 'All'], ['open', 'Open'], ['overdue', 'Overdue'], ['closed', 'Closed'], ['pending_cluster_approval', 'Pending Cluster'], ['pending_zonal_approval', 'Pending Zonal'], ['rejected', 'Rejected']].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setStatusFilter(key)}

@@ -244,22 +244,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* ── Portfolio KPIs ── */}
-      <div>
-        <SectionHeader title="Portfolio Overview" sub="Live snapshot of your lending book" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Open Loans" value={normalizedActive.length} sub={`${formatINRExact(normalizedTotalDisbursed)} active`} icon={TrendingUp} color="blue" />
-          <StatCard title="Total Disbursed" value={formatINRExact(normalizedTotalDisbursed)} sub={`across ${normalizedActive.length} cases`} icon={IndianRupee} color="green" />
-          <StatCard title="Overdue Exposure" value={formatINR(totalOverdue)} sub={`${overdue.length} loans overdue`} icon={AlertTriangle} color="red" />
-          <StatCard title="Total Closed" value={formatINR(totalRepaid)} sub={`Charges earned: ${formatINR(totalInterest)}`} icon={CreditCard} color="purple" />
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-          <StatCard title="Pending Approvals" value={pending.length} sub="Awaiting action" icon={Users} color="yellow" />
-          <StatCard title="Closed Loans" value={closed.length} sub="Fully collected" icon={CreditCard} color="green" />
-          <StatCard title="Total Borrowers" value={new Set(loans.map(l => l.borrower_id).filter(Boolean)).size} sub="Unique businesses" icon={Users} color="blue" />
-          <StatCard title="Total Loans" value={loans.length} sub="All time" icon={IndianRupee} color="purple" />
-        </div>
-      </div>
+
 
       {/* ── Charts Row 1 ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

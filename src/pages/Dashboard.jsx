@@ -23,11 +23,33 @@ export default function Dashboard() {
   const [capitalEntries, setCapitalEntries] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Normalize status values from Excel import
+  function normalizeStatus(status) {
+    if (!status) return 'pending_cluster_approval';
+    if (status === 'Follow Up!') return 'follow_up';
+    if (status === 'open' || status === 'Open') return 'open';
+    if (status === 'closed' || status === 'Closed') return 'closed';
+    if (status === 'overdue' || status === 'Overdue') return 'overdue';
+    if (status === 'pending_cluster_approval') return 'pending_cluster_approval';
+    if (status === 'pending_zonal_approval') return 'pending_zonal_approval';
+    if (status === 'rejected' || status === 'Rejected') return 'rejected';
+    return 'follow_up';
+  }
+
   useEffect(() => {
     Promise.all([
       base44.entities.Loan.list(),
       base44.entities.CapitalEntry.list(),
-    ]).then(([l, c]) => { setLoans(l); setCapitalEntries(c); setLoading(false); });
+    ]).then(([l, c]) => {
+      // Normalize status values
+      const normalized = l.map(loan => ({
+        ...loan,
+        status: normalizeStatus(loan.status)
+      }));
+      setLoans(normalized);
+      setCapitalEntries(c);
+      setLoading(false);
+    });
   }, []);
 
   const [portfolioTab, setPortfolioTab] = useState('mtd');
@@ -38,7 +60,7 @@ export default function Dashboard() {
   const currentYear = getYear(today);
   const currentMonth = format(today, 'MMM yyyy');
 
-  const openLoans = loans.filter(l => l.status === 'open' || l.status === 'overdue' || l.status === 'pending_approval');
+  const openLoans = loans.filter(l => l.status === 'open' || l.status === 'overdue' || l.status === 'pending_cluster_approval' || l.status === 'pending_zonal_approval' || l.status === 'follow_up');
   const closedLoans = loans.filter(l => l.status === 'closed');
   const overdueLoans = loans.filter(l => l.status === 'overdue');
 

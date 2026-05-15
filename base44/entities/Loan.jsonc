@@ -119,10 +119,11 @@
         "open",
         "closed",
         "overdue",
-        "rejected"
+        "rejected",
+        "follow_up"
       ],
       "default": "pending_cluster_approval",
-      "description": "pending_cluster_approval = awaiting cluster manager; pending_zonal_approval = awaiting zonal (>\u20b910L); open = active/disbursed; closed = fully collected; overdue = past due; rejected = declined"
+      "description": "pending_cluster_approval = awaiting cluster manager; pending_zonal_approval = awaiting zonal (>\u20b910L); open = active/disbursed; closed = fully collected; overdue = past due; rejected = declined; follow_up = requires attention"
     },
     "approval_stage": {
       "type": "string",

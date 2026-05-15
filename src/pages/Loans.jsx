@@ -16,6 +16,7 @@ const STATUS_STYLES = {
   pending_cluster_approval: 'bg-yellow-100 text-yellow-800',
   pending_zonal_approval: 'bg-orange-100 text-orange-800',
   rejected: 'bg-gray-100 text-gray-600',
+  follow_up: 'bg-purple-100 text-purple-800',
 };
 
 const STATUS_LABELS = {
@@ -25,7 +26,21 @@ const STATUS_LABELS = {
   pending_cluster_approval: 'Pending Cluster',
   pending_zonal_approval: 'Pending Zonal',
   rejected: 'Rejected',
+  follow_up: 'Follow Up!',
 };
+
+// Normalize status values from Excel import
+function normalizeStatus(status) {
+  if (!status) return 'pending_cluster_approval';
+  if (status === 'Follow Up!') return 'follow_up';
+  if (status === 'open' || status === 'Open') return 'open';
+  if (status === 'closed' || status === 'Closed') return 'closed';
+  if (status === 'overdue' || status === 'Overdue') return 'overdue';
+  if (status === 'pending_cluster_approval') return 'pending_cluster_approval';
+  if (status === 'pending_zonal_approval') return 'pending_zonal_approval';
+  if (status === 'rejected' || status === 'Rejected') return 'rejected';
+  return 'follow_up'; // Default to follow_up for unknown statuses
+}
 
 export default function Loans() {
   const [loans, setLoans] = useState([]);
@@ -40,7 +55,12 @@ export default function Loans() {
 
   useEffect(() => {
     base44.entities.Loan.list('-created_date', 200).then(l => {
-      setLoans(l);
+      // Normalize status values from Excel import
+      const normalized = l.map(loan => ({
+        ...loan,
+        status: normalizeStatus(loan.status)
+      }));
+      setLoans(normalized);
       setLoading(false);
     });
   }, []);

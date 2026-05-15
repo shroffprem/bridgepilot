@@ -3,11 +3,18 @@ import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { formatINR } from '@/lib/mis';
-import { ArrowDownLeft, ArrowUpRight, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, TrendingUp, TrendingDown, Minus, BookOpen, GitMerge } from 'lucide-react';
+import BankReconciliation from '@/components/ledger/BankReconciliation';
 
 function fmt(d) { return d ? format(parseISO(d), 'dd MMM yyyy') : '—'; }
 
+const LEDGER_TABS = [
+  { key: 'ledger', label: 'Daily Ledger', icon: BookOpen },
+  { key: 'reconcile', label: 'Bank Reconciliation', icon: GitMerge },
+];
+
 export default function Ledger() {
+  const [activeTab, setActiveTab] = useState('ledger');
   const [disbursals, setDisbursals] = useState([]);
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -97,11 +104,34 @@ export default function Ledger() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="font-syne font-bold text-xl text-foreground">Daily Cash Ledger</h1>
-          <p className="text-sm text-muted-foreground">Disbursals vs Collections — net cash movement by day</p>
-        </div>
+      <div>
+        <h1 className="font-syne font-bold text-xl text-foreground">Cash Ledger</h1>
+        <p className="text-sm text-muted-foreground">Disbursals, collections, and bank reconciliation</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-border">
+        {LEDGER_TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${
+              activeTab === key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Icon size={14} />{label}
+          </button>
+        ))}
+      </div>
+
+      {/* Reconciliation tab */}
+      {activeTab === 'reconcile' && (
+        <BankReconciliation disbursals={disbursals} collections={collections} />
+      )}
+
+      {/* Ledger tab */}
+      {activeTab === 'ledger' && <>
+      <div className="flex justify-end">
         <input
           type="month"
           value={month}
@@ -237,6 +267,7 @@ export default function Ledger() {
           </div>
         )}
       </div>
+      </>}
     </div>
   );
 }

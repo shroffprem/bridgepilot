@@ -12,6 +12,7 @@ module.exports = {
       fontFamily: {
         inter: ['var(--font-inter)'],
         syne: ['var(--font-syne)'],
+        dm: ['DM Sans', 'sans-serif'],
       },
   		colors: {
   			background: 'hsl(var(--background))',

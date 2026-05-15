@@ -33,6 +33,10 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
     notes: '',
   });
 
+  const amountCollected = parseFloat(form.amount_collected) || 0;
+  const isPartPayment = amountCollected > 0 && amountCollected < totalDue;
+  const remainingAfter = Math.max(0, totalDue - amountCollected);
+
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
 
   const pasteField = async (field) => {
@@ -70,24 +74,28 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
       branch: loan.branch,
       cluster: loan.cluster,
       ...form,
-      amount_collected: parseFloat(form.amount_collected) || 0,
+      amount_collected: amountCollected,
       principal_component: parseFloat(form.principal_component) || 0,
       charges_component: parseFloat(form.charges_component) || 0,
       gst_component: parseFloat(form.gst_component) || 0,
       recorded_by: me?.full_name || me?.email || '',
     });
-    // Close loan if checkbox ticked
     if (form.close_loan) {
+      // Full closure
       await base44.entities.Loan.update(loan.id, {
         status: 'closed',
         closure_date: form.closure_date,
         outstanding: 0,
       });
-      // Send collection/closure memo via WhatsApp
       base44.functions.invoke('generateMemo', {
         loan_id: loan.id,
         collection_id: collectionRecord?.id,
       }).catch(() => {});
+    } else {
+      // Part payment — reduce outstanding
+      await base44.entities.Loan.update(loan.id, {
+        outstanding: remainingAfter,
+      });
     }
     setSaving(false);
     onOpenChange(false);
@@ -117,7 +125,23 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Amount Collected (₹)</Label>
-              <Input type="number" value={form.amount_collected} onChange={set('amount_collected')} />
+              <Input
+                type="number"
+                value={form.amount_collected}
+                onChange={e => {
+                  const val = e.target.value;
+                  const amt = parseFloat(val) || 0;
+                  setForm(p => ({
+                    ...p,
+                    amount_collected: val,
+                    // auto-uncheck close_loan if it's a part payment
+                    close_loan: amt >= totalDue ? p.close_loan : false,
+                  }));
+                }}
+              />
+              {isPartPayment && (
+                <p className="text-xs text-amber-600 font-medium">Part payment — {formatINR(remainingAfter)} will remain outstanding</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Credit Note / UTR No.</Label>

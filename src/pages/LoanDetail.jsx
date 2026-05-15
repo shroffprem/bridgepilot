@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Banknote, BadgeCheck, FileText, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Banknote, BadgeCheck, FileText, Download, Loader2, ArrowDownLeft } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -43,6 +43,7 @@ export default function LoanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loan, setLoan] = useState(null);
+  const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [closeOpen, setCloseOpen] = useState(false);
   const [closureDate, setClosureDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -54,8 +55,12 @@ export default function LoanDetail() {
   const [confirmReopen, setConfirmReopen] = useState(false);
 
   const load = async () => {
-    const [l] = await base44.entities.Loan.filter({ id });
+    const [[l], cols] = await Promise.all([
+      base44.entities.Loan.filter({ id }),
+      base44.entities.Collection.filter({ loan_id: id }),
+    ]);
     setLoan(l);
+    setCollections(cols.sort((a, b) => (a.credit_note_date > b.credit_note_date ? 1 : -1)));
     setLoading(false);
   };
 
@@ -225,6 +230,55 @@ export default function LoanDetail() {
         <div className="bg-card rounded-xl border border-border p-5">
           <h3 className="font-syne font-semibold text-sm mb-4">Approval Trail</h3>
           <ApprovalTrail loan={loan} />
+        </div>
+      )}
+
+      {/* Collections History */}
+      {collections.length > 0 && (
+        <div className="bg-card rounded-xl border border-border p-5">
+          <h3 className="font-syne font-semibold text-sm mb-4 flex items-center gap-2">
+            <ArrowDownLeft size={15} className="text-green-600" /> Collections History ({collections.length})
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/40 text-xs text-muted-foreground uppercase tracking-wide border-b border-border">
+                  <th className="text-left px-3 py-2 font-medium">#</th>
+                  <th className="text-left px-3 py-2 font-medium">Date</th>
+                  <th className="text-right px-3 py-2 font-medium">Amount</th>
+                  <th className="text-left px-3 py-2 font-medium">Mode</th>
+                  <th className="text-left px-3 py-2 font-medium">UTR / Ref</th>
+                  <th className="text-left px-3 py-2 font-medium">Notes</th>
+                  <th className="text-center px-3 py-2 font-medium">Proof</th>
+                </tr>
+              </thead>
+              <tbody>
+                {collections.map((c, i) => (
+                  <tr key={c.id} className="border-t border-border hover:bg-muted/20">
+                    <td className="px-3 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">{c.credit_note_date ? format(new Date(c.credit_note_date), 'dd MMM yyyy') : '—'}</td>
+                    <td className="px-3 py-2.5 text-right font-bold text-green-600">{formatINR(c.amount_collected)}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground capitalize text-xs">{(c.payment_mode || '').replace(/_/g, ' ')}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{c.credit_note_number || '—'}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{c.notes || '—'}</td>
+                    <td className="px-3 py-2.5 text-center">
+                      {c.credit_note_image_url
+                        ? <a href={c.credit_note_image_url} target="_blank" rel="noreferrer" className="text-primary text-xs hover:underline">View</a>
+                        : <span className="text-muted-foreground text-xs">—</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-muted/40 border-t-2 border-border font-bold text-sm">
+                  <td colSpan={2} className="px-3 py-2.5 text-muted-foreground">Total Collected</td>
+                  <td className="px-3 py-2.5 text-right text-green-600">{formatINR(collections.reduce((s, c) => s + (c.amount_collected || 0), 0))}</td>
+                  <td colSpan={4} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
 

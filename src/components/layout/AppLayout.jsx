@@ -54,20 +54,20 @@ export default function AppLayout() {
           )}
         </header>
 
-        <main className="flex-1 p-4 lg:p-6 pb-20 lg:pb-6 overflow-auto">
+        <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 overflow-auto">
           <Outlet />
         </main>
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-card border-t border-border">
-        <div className="flex items-center justify-around">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-card border-t border-border" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="flex items-center justify-around h-16">
           {visibleBottom.map(({ label, icon: Icon, path }) => {
             const isActive = location.pathname === path || (path !== '/' && location.pathname.startsWith(path));
             return (
-              <Link key={path} to={path} className="flex flex-col items-center py-2 px-3 flex-1">
-                <Icon size={20} className={cn(isActive ? 'text-primary' : 'text-muted-foreground')} />
-                <span className={cn('text-[10px] mt-0.5 font-medium', isActive ? 'text-primary' : 'text-muted-foreground')}>
+              <Link key={path} to={path} className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full">
+                <Icon size={22} className={cn(isActive ? 'text-primary' : 'text-muted-foreground')} />
+                <span className={cn('text-[10px] font-medium', isActive ? 'text-primary' : 'text-muted-foreground')}>
                   {label}
                 </span>
               </Link>

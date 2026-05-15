@@ -41,6 +41,21 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
 
   const pasteField = async (field) => {
     const text = await navigator.clipboard.readText();
+    
+    // Auto-extract UTR if pasting into credit_note_number
+    if (field === 'credit_note_number') {
+      try {
+        const utr = text
+          .match(/(?:CNRB|HDFC|ICIC|AXIS|IDBI|SBI|BKID|UTIB|IDFB|AUBL)\d+[A-Z]*/i)?.[0] || 
+          text.match(/[A-Z]{4}\d{10}[A-Z]{2}\d+/)?.[0] ||
+          text.match(/(?:Cr-)?([A-Z]{2,}[A-Z0-9]{8,})/)?.[1];
+        if (utr) {
+          setForm(p => ({ ...p, [field]: utr.trim() }));
+          return;
+        }
+      } catch {}
+    }
+    
     setForm(p => ({ ...p, [field]: text.trim() }));
   };
 

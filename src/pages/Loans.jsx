@@ -116,21 +116,23 @@ export default function Loans() {
         )}
       </div>
 
-      {/* Status pills */}
-      <div className="flex flex-wrap gap-2">
-        {[['all', 'All', loans.length], ...Object.entries(STATUS_LABELS).map(([k, v]) => [k, v, statusCounts[k] || 0])].map(([key, label, count]) => (
-          <button
-            key={key}
-            onClick={() => setStatusFilter(key)}
-            className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
-              statusFilter === key
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-card border-border text-muted-foreground hover:border-primary/50'
-            }`}
-          >
-            {label} {count > 0 && <span className="ml-1 opacity-70">{count}</span>}
-          </button>
-        ))}
+      {/* Status tabs */}
+      <div className="border-b border-border">
+        <div className="flex gap-6 overflow-x-auto">
+          {[['all', 'All'], ['open', 'Open'], ['overdue', 'Overdue'], ['follow_up', 'Follow Up'], ['closed', 'Closed'], ['pending_cluster_approval', 'Pending Cluster'], ['pending_zonal_approval', 'Pending Zonal'], ['rejected', 'Rejected']].map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setStatusFilter(key)}
+              className={`px-0 py-2 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                statusFilter === key
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label} {statusCounts[key] > 0 && <span className="ml-1 text-xs opacity-70">({statusCounts[key]})</span>}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Search + Filters */}

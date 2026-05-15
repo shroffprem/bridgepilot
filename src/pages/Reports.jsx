@@ -52,18 +52,15 @@ function SectionHeader({ title, sub }) {
 
 export default function Reports() {
   const [loans, setLoans] = useState([]);
-  const [repayments, setRepayments] = useState([]);
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       base44.entities.Loan.list(),
-      base44.entities.Repayment.list(),
       base44.entities.Collection.list(),
-    ]).then(([l, r, c]) => {
+    ]).then(([l, c]) => {
       setLoans(l);
-      setRepayments(r);
       setCollections(c);
       setLoading(false);
     });
@@ -119,25 +116,13 @@ export default function Reports() {
   });
   const branchData = Object.values(branchMap).sort((a, b) => b.amount - a.amount);
 
-  // ── Collection Activity Performance by Handler ─────────────────
-  const handlerMap = {};
-  collections.forEach(c => {
-    const key = c.handled_by || 'Unassigned';
-    if (!handlerMap[key]) handlerMap[key] = { handler: key, total: 0, calls: 0, visits: 0, promises: 0, promiseAmt: 0 };
-    handlerMap[key].total++;
-    if (c.activity_type === 'call')             handlerMap[key].calls++;
-    if (c.activity_type === 'visit')            handlerMap[key].visits++;
-    if (c.activity_type === 'payment_promise')  { handlerMap[key].promises++; handlerMap[key].promiseAmt += c.promise_amount || 0; }
-  });
-  const handlerData = Object.values(handlerMap).sort((a, b) => b.total - a.total);
-
-  // ── Repayment Monthly Trend ─────────────────────────────────────
+  // ── Collection Monthly Trend ──────────────────────────────────────
   const monthMap = {};
-  repayments.forEach(r => {
-    if (!r.payment_date) return;
-    const key = format(new Date(r.payment_date), 'MMM yy');
+  collections.forEach(c => {
+    if (!c.credit_note_date) return;
+    const key = format(new Date(c.credit_note_date), 'MMM yy');
     if (!monthMap[key]) monthMap[key] = { month: key, amount: 0, count: 0 };
-    monthMap[key].amount += r.amount_received || 0;
+    monthMap[key].amount += c.amount_collected || 0;
     monthMap[key].count++;
   });
   const trendData = Object.values(monthMap).slice(-8);
@@ -152,13 +137,13 @@ export default function Reports() {
   const ageingData = ageing.map(a => ({
     label: a.label,
     count: overdue.filter(l => {
-      const d = l.maturity_date ? differenceInDays(new Date(), new Date(l.maturity_date)) : 0;
+      const d = l.disbursement_date ? differenceInDays(new Date(), new Date(l.disbursement_date)) : 0;
       return d >= a.min && d <= a.max;
     }).length,
     amount: overdue.filter(l => {
-      const d = l.maturity_date ? differenceInDays(new Date(), new Date(l.maturity_date)) : 0;
+      const d = l.disbursement_date ? differenceInDays(new Date(), new Date(l.disbursement_date)) : 0;
       return d >= a.min && d <= a.max;
-    }).reduce((s, l) => s + (l.total_repayable || l.amount || 0), 0),
+    }).reduce((s, l) => s + (l.outstanding || 0), 0),
   }));
 
   return (
@@ -225,17 +210,17 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* ── Repayment Trend ── */}
+      {/* ── Collection Trend ── */}
       {trendData.length > 0 && (
         <div className="bg-card rounded-xl border border-border p-5">
-          <SectionHeader title="Monthly Repayment Trend" sub="Amount collected per month" />
+          <SectionHeader title="Monthly Collection Trend" sub="Amount collected per month" />
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={v => formatINR(v)} />
               <Tooltip formatter={v => formatINR(v)} />
-              <Line type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4 }} name="Repaid" />
+              <Line type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4 }} name="Collected" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -316,49 +301,49 @@ export default function Reports() {
         )}
       </div>
 
-      {/* ── Collections Handler Performance ── */}
+      {/* ── Collections Summary by Recorded User ── */}
       <div className="bg-card rounded-xl border border-border p-5">
-        <SectionHeader title="Collections — Manager Performance" sub="Activity logged by each collection handler" />
-        {handlerData.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">No collection activities logged yet</div>
+        <SectionHeader title="Collections — Recorded By" sub="Breakdown by user recording collections" />
+        {collections.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">No collections logged yet</div>
         ) : (
           <>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={handlerData} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="handler" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="calls"   name="Calls"   fill="#3b82f6" radius={[4,4,0,0]} />
-                <Bar dataKey="visits"  name="Visits"  fill="#10b981" radius={[4,4,0,0]} />
-                <Bar dataKey="promises" name="Promises" fill="#f59e0b" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            <table className="w-full text-xs mt-4">
-              <thead>
-                <tr className="border-b border-border text-muted-foreground uppercase">
-                  <th className="text-left px-2 py-2 font-medium">Handler</th>
-                  <th className="text-right px-2 py-2 font-medium">Total</th>
-                  <th className="text-right px-2 py-2 font-medium">Calls</th>
-                  <th className="text-right px-2 py-2 font-medium">Visits</th>
-                  <th className="text-right px-2 py-2 font-medium">Promises</th>
-                  <th className="text-right px-2 py-2 font-medium">Promise Amt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {handlerData.map(h => (
-                  <tr key={h.handler} className="border-b border-border last:border-0 hover:bg-muted/20">
-                    <td className="px-2 py-2 font-semibold">{h.handler}</td>
-                    <td className="px-2 py-2 text-right">{h.total}</td>
-                    <td className="px-2 py-2 text-right text-blue-600">{h.calls}</td>
-                    <td className="px-2 py-2 text-right text-green-600">{h.visits}</td>
-                    <td className="px-2 py-2 text-right text-yellow-600">{h.promises}</td>
-                    <td className="px-2 py-2 text-right font-semibold">{formatINR(h.promiseAmt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {(() => {
+              const recordedByMap = {};
+              collections.forEach(c => {
+                const key = c.recorded_by || 'Unassigned';
+                if (!recordedByMap[key]) recordedByMap[key] = { user: key, total: 0, amount: 0, principalAmt: 0, chargesAmt: 0 };
+                recordedByMap[key].total++;
+                recordedByMap[key].amount += c.amount_collected || 0;
+                recordedByMap[key].principalAmt += c.principal_component || 0;
+                recordedByMap[key].chargesAmt += c.charges_component || 0;
+              });
+              const recordedData = Object.values(recordedByMap).sort((a, b) => b.amount - a.amount);
+              return (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-muted-foreground uppercase">
+                      <th className="text-left px-2 py-2 font-medium">User</th>
+                      <th className="text-right px-2 py-2 font-medium">Collections</th>
+                      <th className="text-right px-2 py-2 font-medium">Total Amount</th>
+                      <th className="text-right px-2 py-2 font-medium">Principal</th>
+                      <th className="text-right px-2 py-2 font-medium">Charges</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recordedData.map(r => (
+                      <tr key={r.user} className="border-b border-border last:border-0 hover:bg-muted/20">
+                        <td className="px-2 py-2 font-semibold">{r.user}</td>
+                        <td className="px-2 py-2 text-right">{r.total}</td>
+                        <td className="px-2 py-2 text-right font-semibold text-green-600">{formatINR(r.amount)}</td>
+                        <td className="px-2 py-2 text-right text-muted-foreground">{formatINR(r.principalAmt)}</td>
+                        <td className="px-2 py-2 text-right text-muted-foreground">{formatINR(r.chargesAmt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
           </>
         )}
       </div>

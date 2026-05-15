@@ -64,15 +64,15 @@ export default function Dashboard() {
   const active = portfolioTab === 'mtd' ? mtd : ytd;
   const activeLoans = portfolioTab === 'mtd' ? mtdLoans : ytdLoans;
 
+  // Capital deployed (live from CapitalEntry records)
+  const capitalDeployed = capitalEntries.reduce((s, e) => e.type === 'addition' ? s + e.amount : s - e.amount, 0);
+
   // Monthly goalpost — target is 4% of capital deployed
   const monthlyTarget = capitalDeployed * 0.04;
   const daysLeftInMonth = differenceInDays(endOfMonth(today), today) + 1;
   const remaining = Math.max(0, monthlyTarget - mtd.charges);
   const pctAchieved = monthlyTarget > 0 ? Math.min(100, (mtd.charges / monthlyTarget) * 100) : 0;
   const dailyChargeNeeded = daysLeftInMonth > 0 ? remaining / daysLeftInMonth : 0;
-
-  // Capital deployed (live from CapitalEntry records)
-  const capitalDeployed = capitalEntries.reduce((s, e) => e.type === 'addition' ? s + e.amount : s - e.amount, 0);
 
   // All-time
   const allTimeCharges = loans.reduce((s, l) => s + calcCharges(l), 0);

@@ -16,6 +16,11 @@ function formatINR(n) {
   return `₹${n}`;
 }
 
+function formatINRExact(n) {
+  if (!n) return '₹0';
+  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+}
+
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 function StatCard({ title, value, sub, icon: Icon, color = 'blue' }) {
@@ -82,6 +87,20 @@ export default function Reports() {
   const totalOverdue     = overdue.reduce((s, l) => s + (l.outstanding || 0), 0);
   const totalRepaid      = closed.reduce((s, l) => s + (l.principal || 0), 0);
   const totalInterest    = loans.reduce((s, l) => s + (l.charges || 0), 0);
+  
+  // Normalize statuses for accurate filtering
+  const normalizedLoans = loans.map(l => ({
+    ...l,
+    status: !l.status ? 'open' : 
+            (l.status === 'Follow Up!' || l.status === 'follow_up') ? 'open' :
+            (l.status === 'Open') ? 'open' :
+            (l.status === 'Closed') ? 'closed' :
+            (l.status === 'Overdue') ? 'overdue' :
+            (l.status === 'Rejected') ? 'rejected' : l.status
+  }));
+  
+  const normalizedActive = normalizedLoans.filter(l => l.status === 'open');
+  const normalizedTotalDisbursed = normalizedActive.reduce((s, l) => s + (l.principal || 0), 0);
 
   // ── Status Distribution (pie) ──────────────────────────────────
   const statusGroups = ['draft','pending_cluster_approval','pending_zonal_approval','approved','disbursed','repaid','overdue','rejected'];
@@ -153,8 +172,8 @@ export default function Reports() {
       <div>
         <SectionHeader title="Portfolio Overview" sub="Live snapshot of your lending book" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Open Loans" value={active.length} sub={`₹ ${formatINR(totalDisbursed)} active`} icon={TrendingUp} color="blue" />
-          <StatCard title="Total Disbursed" value={formatINR(totalDisbursed)} sub={`across ${active.length} cases`} icon={IndianRupee} color="green" />
+          <StatCard title="Open Loans" value={normalizedActive.length} sub={`${formatINRExact(normalizedTotalDisbursed)} active`} icon={TrendingUp} color="blue" />
+          <StatCard title="Total Disbursed" value={formatINRExact(normalizedTotalDisbursed)} sub={`across ${normalizedActive.length} cases`} icon={IndianRupee} color="green" />
           <StatCard title="Overdue Exposure" value={formatINR(totalOverdue)} sub={`${overdue.length} loans overdue`} icon={AlertTriangle} color="red" />
           <StatCard title="Total Closed" value={formatINR(totalRepaid)} sub={`Charges earned: ${formatINR(totalInterest)}`} icon={CreditCard} color="purple" />
         </div>

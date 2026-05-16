@@ -13,16 +13,15 @@ async function fetchLogoBase64() {
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    // Validate PNG magic bytes
-    if (bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4E || bytes[3] !== 0x47) return null;
-    const CHUNK = 4096;
+    // Encode in 3-byte aligned chunks (base64 requires multiples of 3)
+    const CHUNK = 3 * 1024; // 3072 bytes — always 3-byte aligned
     let base64 = '';
     for (let i = 0; i < bytes.length; i += CHUNK) {
       const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
       base64 += btoa(String.fromCharCode(...Array.from(slice)));
     }
-    return 'data:image/png;base64,' + base64;
-  } catch { return null; }
+    return { data: 'data:image/png;base64,' + base64, format: 'PNG' };
+  } catch (e) { console.log('Logo fetch error:', e.message); return null; }
 }
 
 function drawLetterhead(doc, logoBase64, W, margin) {
@@ -32,7 +31,11 @@ function drawLetterhead(doc, logoBase64, W, margin) {
   doc.rect(0, 0, W, 42, 'F');
 
   if (logoBase64) {
-    try { doc.addImage(logoBase64, 'PNG', margin, 7, 24, 24); } catch (_) { /* skip logo if corrupt */ }
+    try {
+      doc.addImage(logoBase64.data, logoBase64.format, margin, 7, 24, 24);
+    } catch (e) {
+      console.log('addImage error:', e.message);
+    }
   }
 
   doc.setTextColor(255, 255, 255);

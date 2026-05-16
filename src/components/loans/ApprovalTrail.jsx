@@ -1,5 +1,6 @@
 import { CheckCircle2, Clock, XCircle, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 const STAGES = [
   { key: 'branch',  label: 'Branch Manager',  desc: 'Loan request raised' },
@@ -84,17 +85,23 @@ export default function ApprovalTrail({ loan }) {
                   <div className={cn('text-sm font-medium', labelClass)}>{stage.label}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{stage.desc}</div>
 
-                  {/* Show who approved + notes */}
+                  {/* Show who approved + when + notes */}
                   {stage.key === 'cluster' && loan.approved_by_cluster && st === 'done' && (
                     <div className="mt-1 text-xs text-muted-foreground">
                       Approved by <span className="font-medium text-foreground">{loan.approved_by_cluster}</span>
-                      {loan.cluster_manager_notes && <span> · "{loan.cluster_manager_notes}"</span>}
+                      {loan.cluster_approved_date && (
+                        <span className="ml-1 text-muted-foreground">· {format(new Date(loan.cluster_approved_date), 'dd MMM yyyy, h:mm a')}</span>
+                      )}
+                      {loan.cluster_manager_notes && <div className="mt-0.5 italic">"{loan.cluster_manager_notes}"</div>}
                     </div>
                   )}
                   {stage.key === 'zonal' && loan.approved_by_zonal && st === 'done' && (
                     <div className="mt-1 text-xs text-muted-foreground">
                       Approved by <span className="font-medium text-foreground">{loan.approved_by_zonal}</span>
-                      {loan.zonal_manager_notes && <span> · "{loan.zonal_manager_notes}"</span>}
+                      {loan.zonal_approved_date && (
+                        <span className="ml-1 text-muted-foreground">· {format(new Date(loan.zonal_approved_date), 'dd MMM yyyy, h:mm a')}</span>
+                      )}
+                      {loan.zonal_manager_notes && <div className="mt-0.5 italic">"{loan.zonal_manager_notes}"</div>}
                     </div>
                   )}
                   {loan.status === 'rejected' && stage.key === (loan.approval_stage === 'zonal' ? 'zonal' : 'cluster') && loan.rejection_reason && (

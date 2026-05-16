@@ -158,8 +158,18 @@
     "approved_by_cluster": {
       "type": "string"
     },
+    "cluster_approved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when cluster manager approved"
+    },
     "approved_by_zonal": {
       "type": "string"
+    },
+    "zonal_approved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when zonal manager approved"
     }
   },
   "required": [

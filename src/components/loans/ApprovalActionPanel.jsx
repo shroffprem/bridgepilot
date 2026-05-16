@@ -28,15 +28,16 @@ export default function ApprovalActionPanel({ loan, onUpdate }) {
 
   const handleApprove = async () => {
     setSaving(true);
+    const now = new Date().toISOString();
     if (isClusterStage) {
       await base44.entities.Loan.update(loan.id, requiresZonal
-        ? { status: 'pending_zonal_approval', approval_stage: 'zonal', cluster_manager_notes: notes, approved_by_cluster: actorName }
-        : { status: 'open', approval_stage: 'complete', cluster_manager_notes: notes, approved_by_cluster: actorName }
+        ? { status: 'pending_zonal_approval', approval_stage: 'zonal', cluster_manager_notes: notes, approved_by_cluster: actorName, cluster_approved_date: now }
+        : { status: 'open', approval_stage: 'complete', cluster_manager_notes: notes, approved_by_cluster: actorName, cluster_approved_date: now }
       );
     } else {
       await base44.entities.Loan.update(loan.id, {
         status: 'open', approval_stage: 'complete',
-        zonal_manager_notes: notes, approved_by_zonal: actorName
+        zonal_manager_notes: notes, approved_by_zonal: actorName, zonal_approved_date: now
       });
     }
     setSaving(false);

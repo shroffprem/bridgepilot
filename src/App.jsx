@@ -16,6 +16,7 @@ import MasterDirectory from '@/pages/MasterDirectory';
 import Admin from '@/pages/Admin';
 import Approvals from '@/pages/Approvals';
 import Ledger from '@/pages/Ledger';
+import Companies from '@/pages/Companies';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -50,6 +51,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin" element={<Admin />} />
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/ledger" element={<Ledger />} />
+        <Route path="/companies" element={<Companies />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

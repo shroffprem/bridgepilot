@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
   LayoutDashboard, FileText, Users, BarChart2,
-  Building2, ShieldCheck, CheckSquare, LogOut, BookOpen,
+  Building2, ShieldCheck, CheckSquare, LogOut, BookOpen, Landmark,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
@@ -14,6 +14,7 @@ const ALL_NAV = [
   { label: 'Reports',          icon: BarChart2,       path: '/reports',   roles: ['admin'] },
   { label: 'Borrowers',        icon: Users,           path: '/borrowers', roles: ['admin'] },
   { label: 'Master Directory', icon: Building2,       path: '/directory', roles: ['admin'] },
+  { label: 'Partners & Territories', icon: Landmark,  path: '/companies', roles: ['admin'] },
   { label: 'Cash Ledger',     icon: BookOpen,        path: '/ledger',    roles: ['admin'] },
 ];
 const ADMIN_NAV = [

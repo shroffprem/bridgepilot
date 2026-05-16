@@ -1,0 +1,48 @@
+{
+  "name": "Territory",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "zone",
+        "cluster",
+        "branch"
+      ],
+      "description": "Level in the hierarchy"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the territory"
+    },
+    "parent_name": {
+      "type": "string",
+      "description": "Parent territory name (zone for cluster, cluster for branch)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Associated partner company"
+    },
+    "manager_name": {
+      "type": "string"
+    },
+    "manager_phone": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "type",
+    "name"
+  ]
+}

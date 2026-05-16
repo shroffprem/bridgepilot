@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import { jsPDF } from 'npm:jspdf@4.2.1';
+import { jsPDF } from 'npm:jspdf@2.5.1';
 import { format, getYear, endOfMonth, differenceInDays } from 'npm:date-fns@3.6.0';
 
 // ── BridgeLine Partners brand constants ──────────────────────
@@ -13,10 +13,13 @@ async function fetchLogoBase64() {
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    const CHUNK = 8192;
+    // Validate PNG magic bytes
+    if (bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4E || bytes[3] !== 0x47) return null;
+    const CHUNK = 4096;
     let base64 = '';
     for (let i = 0; i < bytes.length; i += CHUNK) {
-      base64 += btoa(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+      const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
+      base64 += btoa(String.fromCharCode(...Array.from(slice)));
     }
     return 'data:image/png;base64,' + base64;
   } catch { return null; }
@@ -28,7 +31,9 @@ function drawLetterhead(doc, logoBase64, W, margin) {
   doc.setFillColor(...NAVY);
   doc.rect(0, 0, W, 42, 'F');
 
-  if (logoBase64) doc.addImage(logoBase64, 'PNG', margin, 7, 24, 24);
+  if (logoBase64) {
+    try { doc.addImage(logoBase64, 'PNG', margin, 7, 24, 24); } catch (_) { /* skip logo if corrupt */ }
+  }
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');

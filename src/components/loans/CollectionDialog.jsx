@@ -17,7 +17,11 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
   const [pastedImage, setPastedImage] = useState(null);
   const charges = calcCharges(loan || {});
   const gst = loan?.gst != null ? loan.gst : calcGST(charges);
-  const totalDue = calcOutstanding(loan || {});
+  // Use same charges+gst values for total (not calcOutstanding which may round differently)
+  const totalDue = loan?.status === 'closed' ? 0 :
+    (loan?.outstanding != null && loan?.outstanding > 0)
+      ? loan.outstanding
+      : (loan?.principal || 0) + charges + gst;
 
   const [form, setForm] = useState({
     amount_collected: totalDue || '',

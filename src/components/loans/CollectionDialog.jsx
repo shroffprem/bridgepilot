@@ -52,11 +52,27 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
           setForm(p => ({ ...p, amount_collected: cleanAmount }));
         }
         
-        // Extract UTR
-        const utr = text
-          .match(/(?:CNRB|HDFC|ICIC|AXIS|IDBI|SBI|BKID|UTIB|IDFB|AUBL)\d+[A-Z]*/i)?.[0] || 
-          text.match(/[A-Z]{4}\d{10}[A-Z]{2}\d+/)?.[0] ||
-          text.match(/(?:Cr-)?([A-Z]{2,}[A-Z0-9]{8,})/)?.[1];
+        // Extract UTR — for RTGS/NEFT credit notes like:
+        // "RTGS Cr-IOBA0000971-VIJAYA-BRIDGELINE PARTNERS-IOBAR52026051600616422"
+        // The real UTR is always the LAST hyphen-separated segment (longest alphanumeric token)
+        let utr = null;
+
+        // 1. Try last segment after hyphen (handles bank credit note format)
+        const lastSegmentMatch = text.match(/-([A-Z0-9]{10,})(?:\s|$)/i);
+        if (lastSegmentMatch) {
+          utr = lastSegmentMatch[1];
+        }
+
+        // 2. Fallback: standard UTR pattern (22-char alphanumeric)
+        if (!utr) {
+          utr = text.match(/[A-Z]{4}[A-Z0-9]{18}/i)?.[0];
+        }
+
+        // 3. Fallback: known bank prefix patterns
+        if (!utr) {
+          utr = text.match(/(?:CNRB|HDFC|ICIC|AXIS|IDBI|SBI|BKID|UTIB|IDFB|AUBL|IOBA|KKBK)\d+[A-Z0-9]*/i)?.[0];
+        }
+
         if (utr) {
           setForm(p => ({ ...p, [field]: utr.trim() }));
           return;

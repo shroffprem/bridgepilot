@@ -13,7 +13,6 @@ async function fetchLogoBase64() {
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    // Use Deno's built-in base64 encoder to handle large buffers correctly
     const CHUNK = 8192;
     let base64 = '';
     for (let i = 0; i < bytes.length; i += CHUNK) {
@@ -31,7 +30,6 @@ function drawLetterhead(doc, logoBase64, W, margin) {
 
   if (logoBase64) doc.addImage(logoBase64, 'PNG', margin, 7, 24, 24);
 
-  // Brand name — left side, vertically centered in header
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
@@ -41,10 +39,8 @@ function drawLetterhead(doc, logoBase64, W, margin) {
   doc.setFont('helvetica', 'normal');
   doc.text('Partners', logoRight + blW + 1.5, 22);
 
-  // Right side contact block — no charSpace (causes truncation), use plain labels
   const rx = W - margin;
 
-  // ADDRESS
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6);
   doc.setTextColor(...GOLD);
@@ -56,7 +52,6 @@ function drawLetterhead(doc, logoBase64, W, margin) {
   doc.text('Vijaynagar 3rd Stage, E Block, Garudachar Layout,', rx, 17.5, { align: 'right' });
   doc.text('Mysuru, Karnataka - 570030', rx, 22, { align: 'right' });
 
-  // CONTACT
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6);
   doc.setTextColor(...GOLD);
@@ -66,7 +61,6 @@ function drawLetterhead(doc, logoBase64, W, margin) {
   doc.setTextColor(255, 255, 255);
   doc.text('+91 96862 88166  |  +91 98451 22023', rx, 32.5, { align: 'right' });
 
-  // GSTIN
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6);
   doc.setTextColor(...GOLD);
@@ -96,6 +90,7 @@ function drawLetterhead(doc, logoBase64, W, margin) {
   doc.text(pText, footerX - totalFW / 2 + bW2 + 0.5, pageH - 8);
 }
 
+// ── Helpers ──────────────────────────────────────────────────
 function calcCharges(l) {
   if (l.charges != null && l.charges > 0) return l.charges;
   return (l.principal || 0) * (l.rate || 0) / 100;
@@ -124,6 +119,50 @@ function monthKey(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
+function avgTAT(loanList) {
+  const closed = loanList.filter(l => l.closure_date && l.disbursement_date);
+  if (!closed.length) return '-';
+  const total = closed.reduce((s, l) => {
+    const days = Math.max(0, Math.round((new Date(l.closure_date) - new Date(l.disbursement_date)) / 86400000));
+    return s + days;
+  }, 0);
+  return (total / closed.length).toFixed(1);
+}
+
+// ── Section drawing helpers ───────────────────────────────────
+function checkPageBreak(doc, logoBase64, W, margin, y, needed) {
+  const pageH = doc.internal.pageSize.height;
+  if (y + needed > pageH - 20) {
+    doc.addPage();
+    drawLetterhead(doc, logoBase64, W, margin);
+    return 52;
+  }
+  return y;
+}
+
+function drawSectionHeader(doc, text, margin, y, W) {
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...NAVY);
+  doc.text(text, margin, y);
+  return y + 5;
+}
+
+function drawTableHeader(doc, headers, widths, margin, y, fullW) {
+  const useW = fullW || widths.reduce((a, b) => a + b, 0);
+  doc.setFillColor(...NAVY);
+  doc.rect(margin, y, useW, 7, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  let xPos = margin + 1;
+  headers.forEach((h, i) => {
+    const align = i >= 1 ? 'right' : 'left';
+    doc.text(h, align === 'right' ? xPos + widths[i] - 2 : xPos, y + 5, { align });
+    xPos += widths[i];
+  });
+  return y + 8;
+}
 
 Deno.serve(async (req) => {
   try {
@@ -132,7 +171,7 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const reportType = body.reportType || 'mtd'; // 'mtd' or 'ytd'
+    const reportType = body.reportType || 'mtd';
 
     const [rawLoans, capitalEntries] = await Promise.all([
       base44.entities.Loan.list(),
@@ -145,7 +184,7 @@ Deno.serve(async (req) => {
     const currentYear = getYear(today);
     const currentMonthKey = today.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 
-    // Filter loans for the period
+    // Period loans
     const periodLoans = reportType === 'mtd'
       ? loans.filter(l => l.disbursement_date && monthKey(l.disbursement_date) === currentMonthKey)
       : loans.filter(l => l.disbursement_date && getYear(new Date(l.disbursement_date)) === currentYear);
@@ -153,7 +192,7 @@ Deno.serve(async (req) => {
     // Capital deployed
     const capitalDeployed = capitalEntries.reduce((s, e) => e.type === 'addition' ? s + e.amount : s - e.amount, 0);
 
-    // Build monthly breakdown
+    // ── Monthly breakdown ─────────────────────────────────────
     const monthMap = {};
     for (const l of periodLoans) {
       const key = monthKey(l.disbursement_date);
@@ -175,17 +214,16 @@ Deno.serve(async (req) => {
     }
     const monthlyRows = Object.values(monthMap).sort((a, b) => new Date(a.month) - new Date(b.month));
 
-    // Summary totals
+    // ── Summary totals ────────────────────────────────────────
     const totalCases = periodLoans.length;
     const totalVolume = periodLoans.reduce((s, l) => s + (l.principal || 0), 0);
     const totalCharges = periodLoans.reduce((s, l) => s + calcCharges(l), 0);
-    const totalGST = periodLoans.reduce((s, l) => s + (l.gst != null ? l.gst : calcGST(calcCharges(l))), 0);
     const totalOutstanding = periodLoans.filter(l => l.status !== 'closed').reduce((s, l) => s + calcOutstanding(l), 0);
     const totalCollected = periodLoans.filter(l => l.status === 'closed').reduce((s, l) => s + (l.principal || 0) + calcCharges(l), 0);
     const totalClosed = periodLoans.filter(l => l.status === 'closed').length;
     const totalOpen = periodLoans.filter(l => l.status === 'open' || l.status === 'overdue').length;
 
-    // Monthly goalpost (only for MTD)
+    // ── MTD Goalpost ──────────────────────────────────────────
     const monthlyTarget = capitalDeployed * 0.04;
     const mtdCharges = periodLoans.reduce((s, l) => s + calcCharges(l), 0);
     const pctAchieved = monthlyTarget > 0 ? Math.min(100, (mtdCharges / monthlyTarget) * 100) : 0;
@@ -193,19 +231,62 @@ Deno.serve(async (req) => {
     const remaining = Math.max(0, monthlyTarget - mtdCharges);
     const dailyChargeNeeded = daysLeftInMonth > 0 ? remaining / daysLeftInMonth : 0;
 
-    // Cluster breakdown for the period
-    const clusterMap = {};
-    for (const l of periodLoans) {
-      const key = l.cluster || 'Other';
-      if (!clusterMap[key]) clusterMap[key] = { cluster: key, cases: 0, closed: 0, volume: 0, charges: 0 };
-      clusterMap[key].cases++;
-      if (l.status === 'closed') clusterMap[key].closed++;
-      clusterMap[key].volume += l.principal || 0;
-      clusterMap[key].charges += calcCharges(l);
-    }
-    const clusterRows = Object.values(clusterMap).sort((a, b) => b.charges - a.charges);
+    // ── Open Cases (all clusters) ─────────────────────────────
+    const openStatuses = ['open', 'overdue', 'pending_cluster_approval', 'pending_zonal_approval', 'follow_up'];
+    const openCases = loans
+      .filter(l => openStatuses.includes(l.status))
+      .map(l => {
+        const charges = calcCharges(l);
+        const outstanding = calcOutstanding(l);
+        const days = l.disbursement_date ? Math.round((today - new Date(l.disbursement_date)) / 86400000) : 0;
+        return { ...l, _charges: charges, _outstanding: outstanding, _days: days };
+      })
+      .sort((a, b) => a._days - b._days);
 
-    // ── Build PDF ──────────────────────────────────────────────────
+    // ── Overdue Ageing ────────────────────────────────────────
+    const overdueLoans = loans.filter(l => l.status === 'overdue');
+    const ageBuckets = [
+      { label: '1-7 days',   min: 1,  max: 7  },
+      { label: '8-15 days',  min: 8,  max: 15 },
+      { label: '16-30 days', min: 16, max: 30 },
+      { label: '31-60 days', min: 31, max: 60 },
+      { label: '61-90 days', min: 61, max: 90 },
+      { label: '> 90 days',  min: 91, max: 9999 },
+    ];
+    const ageingRows = ageBuckets.map(b => {
+      const bucket = overdueLoans.filter(l => {
+        const d = l.disbursement_date ? differenceInDays(today, new Date(l.disbursement_date)) : 0;
+        return d >= b.min && d <= b.max;
+      });
+      return { label: b.label, count: bucket.length, outstanding: bucket.reduce((s, l) => s + calcOutstanding(l), 0) };
+    });
+
+    // ── Cluster Summary (open cases only) ─────────────────────
+    const clusterSummaryMap = {};
+    openCases.forEach(l => {
+      const key = l.cluster || 'Other';
+      if (!clusterSummaryMap[key]) clusterSummaryMap[key] = { cluster: key, count: 0, principal: 0, charges: 0, outstanding: 0 };
+      clusterSummaryMap[key].count++;
+      clusterSummaryMap[key].principal += l.principal || 0;
+      clusterSummaryMap[key].charges += l._charges;
+      clusterSummaryMap[key].outstanding += l._outstanding;
+    });
+    const clusterSummaryRows = Object.values(clusterSummaryMap).sort((a, b) => b.outstanding - a.outstanding);
+
+    // ── Cluster Analytics (all loans, YTD-style) ──────────────
+    const analyticsMap = {};
+    loans.forEach(l => {
+      const key = l.cluster || 'Other';
+      if (!analyticsMap[key]) analyticsMap[key] = { cluster: key, loans: [], cases: 0, closed: 0, principal: 0, charges: 0 };
+      analyticsMap[key].cases++;
+      if (l.status === 'closed') analyticsMap[key].closed++;
+      analyticsMap[key].principal += l.principal || 0;
+      analyticsMap[key].charges += calcCharges(l);
+      analyticsMap[key].loans.push(l);
+    });
+    const analyticsRows = Object.values(analyticsMap).sort((a, b) => b.charges - a.charges);
+
+    // ── Build PDF ─────────────────────────────────────────────
     const logoBase64 = await fetchLogoBase64();
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.width;
@@ -217,7 +298,6 @@ Deno.serve(async (req) => {
       ? format(today, 'MMMM yyyy')
       : `January - December ${currentYear}`;
 
-    // ── Page 1 ─────────────────────────────────────────────────────
     drawLetterhead(doc, logoBase64, W, margin);
 
     doc.setFont('helvetica', 'bold');
@@ -226,8 +306,9 @@ Deno.serve(async (req) => {
     doc.text('29ABGFB6346P1ZR', W - margin, 48.5, { align: 'right' });
 
     let y = 52;
+    let xPos;
 
-    // Report title band
+    // ── 1. Report title band ───────────────────────────────────
     doc.setFillColor(...NAVY);
     doc.roundedRect(margin, y, contentW, 10, 1, 1, 'F');
     doc.setTextColor(255, 255, 255);
@@ -238,12 +319,12 @@ Deno.serve(async (req) => {
     doc.text(`As of ${todayStr}`, W - margin - 2, y + 7, { align: 'right' });
     y += 14;
 
-    // KPI boxes
+    // ── 2. KPI boxes ──────────────────────────────────────────
     const kpis = [
       { label: 'CASES DISBURSED', value: `${totalCases}  (${totalOpen} open / ${totalClosed} closed)` },
       { label: 'TOTAL DISBURSED', value: 'Rs ' + formatINR(totalVolume) },
-      { label: 'CHARGES EARNED', value: 'Rs ' + formatINR(totalCharges) },
-      { label: 'OUTSTANDING', value: 'Rs ' + formatINR(totalOutstanding) },
+      { label: 'CHARGES EARNED',  value: 'Rs ' + formatINR(totalCharges) },
+      { label: 'OUTSTANDING',     value: 'Rs ' + formatINR(totalOutstanding) },
     ];
     const kpiW = contentW / kpis.length - 2;
     kpis.forEach((kpi, i) => {
@@ -260,53 +341,22 @@ Deno.serve(async (req) => {
     });
     y += 20;
 
-    // ── Month-wise breakdown table ─────────────────────────────────
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...NAVY);
-    doc.text('MONTH-WISE BREAKDOWN', margin, y);
-    y += 5;
+    // ── 3. Month-wise breakdown table ─────────────────────────
+    y = checkPageBreak(doc, logoBase64, W, margin, y, 50);
+    y = drawSectionHeader(doc, 'MONTH-WISE BREAKDOWN', margin, y, W);
 
     const mHeaders = ['MONTH', 'CASES', 'VOLUME', 'CHARGES', 'COLLECTED', 'OUTSTANDING', 'CL/OP', 'ROI%'];
     const mWidths  = [24, 13, 24, 22, 24, 26, 14, 16];
-
-    doc.setFillColor(...NAVY);
-    doc.rect(margin, y, contentW, 7, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.5);
-    let xPos = margin + 1;
-    mHeaders.forEach((h, i) => {
-      const align = i >= 1 ? 'right' : 'left';
-      doc.text(h, align === 'right' ? xPos + mWidths[i] - 2 : xPos, y + 5, { align });
-      xPos += mWidths[i];
-    });
-    y += 8;
+    y = drawTableHeader(doc, mHeaders, mWidths, margin, y, contentW);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
 
     monthlyRows.forEach((m, idx) => {
-      if (y > pageH - 20) {
-        doc.addPage();
-        drawLetterhead(doc, logoBase64, W, margin);
-        y = 52;
-      }
+      y = checkPageBreak(doc, logoBase64, W, margin, y, 8);
       const roi = capitalDeployed > 0 ? ((m.charges / capitalDeployed) * 100).toFixed(2) : '0';
-      const rowData = [
-        m.month,
-        String(m.cases),
-        'Rs ' + formatINR(m.volume),
-        'Rs ' + formatINR(m.charges),
-        'Rs ' + formatINR(m.collected),
-        'Rs ' + formatINR(m.outstanding),
-        `${m.closed}/${m.open}`,
-        roi + '%',
-      ];
-      if (idx % 2 === 0) {
-        doc.setFillColor(245, 247, 252);
-        doc.rect(margin, y - 3, contentW, 5.5, 'F');
-      }
+      const rowData = [m.month, String(m.cases), 'Rs ' + formatINR(m.volume), 'Rs ' + formatINR(m.charges), 'Rs ' + formatINR(m.collected), 'Rs ' + formatINR(m.outstanding), `${m.closed}/${m.open}`, roi + '%'];
+      if (idx % 2 === 0) { doc.setFillColor(245, 247, 252); doc.rect(margin, y - 3, contentW, 5.5, 'F'); }
       doc.setTextColor(30, 30, 50);
       xPos = margin + 1;
       rowData.forEach((cell, i) => {
@@ -319,7 +369,6 @@ Deno.serve(async (req) => {
       y += 5.5;
     });
 
-    // Totals row (if multiple months)
     if (monthlyRows.length > 1) {
       y += 2;
       doc.setFillColor(...NAVY);
@@ -338,21 +387,12 @@ Deno.serve(async (req) => {
       y += 12;
     }
 
-    // ── MTD Goalpost (only for MTD) ────────────────────────────────
+    // ── 4. Monthly Goalpost (MTD only) ────────────────────────
     if (reportType === 'mtd') {
       y += 4;
-      if (y > pageH - 50) {
-        doc.addPage();
-        drawLetterhead(doc, logoBase64, W, margin);
-        y = 52;
-      }
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...NAVY);
-      doc.text(`MONTHLY ROI GOALPOST - ${format(today, 'MMM yyyy')}  (4% of deployed capital)`, margin, y);
-      y += 5;
+      y = checkPageBreak(doc, logoBase64, W, margin, y, 50);
+      y = drawSectionHeader(doc, `MONTHLY ROI GOALPOST - ${format(today, 'MMM yyyy')}  (4% of deployed capital)`, margin, y, W);
 
-      // Progress bar
       const barW = contentW;
       doc.setFillColor(230, 233, 240);
       doc.roundedRect(margin, y, barW, 6, 1, 1, 'F');
@@ -367,11 +407,11 @@ Deno.serve(async (req) => {
 
       const goalKpis = [
         { label: 'CAPITAL DEPLOYED', value: 'Rs ' + formatINR(capitalDeployed) },
-        { label: 'CHARGES EARNED', value: 'Rs ' + formatINR(mtdCharges) },
-        { label: 'REMAINING', value: 'Rs ' + formatINR(remaining) },
-        { label: 'DAYS LEFT', value: String(daysLeftInMonth) },
-        { label: 'DAILY NEEDED', value: 'Rs ' + formatINR(dailyChargeNeeded) },
-        { label: 'TARGET (4%)', value: 'Rs ' + formatINR(monthlyTarget) },
+        { label: 'CHARGES EARNED',   value: 'Rs ' + formatINR(mtdCharges) },
+        { label: 'REMAINING',        value: 'Rs ' + formatINR(remaining) },
+        { label: 'DAYS LEFT',        value: String(daysLeftInMonth) },
+        { label: 'DAILY NEEDED',     value: 'Rs ' + formatINR(dailyChargeNeeded) },
+        { label: 'TARGET (4%)',       value: 'Rs ' + formatINR(monthlyTarget) },
       ];
       const gkpiW = (contentW - 5 * 2) / 6;
       goalKpis.forEach((kpi, i) => {
@@ -386,7 +426,6 @@ Deno.serve(async (req) => {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(5.5);
         doc.text(kpi.label, kx + 2, y + 5);
-        doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
         doc.setTextColor(30, 30, 50);
         doc.text(kpi.value, kx + 2, y + 11, { maxWidth: gkpiW - 3 });
@@ -394,60 +433,168 @@ Deno.serve(async (req) => {
       y += 20;
     }
 
-    // ── Cluster Analytics ──────────────────────────────────────────
+    // ── 5. Overdue Ageing ─────────────────────────────────────
     y += 4;
-    if (y > pageH - 60) {
-      doc.addPage();
-      drawLetterhead(doc, logoBase64, W, margin);
-      y = 52;
-    }
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...NAVY);
-    doc.text(`CLUSTER ANALYTICS - ${reportType.toUpperCase()}`, margin, y);
-    y += 5;
+    y = checkPageBreak(doc, logoBase64, W, margin, y, 60);
+    y = drawSectionHeader(doc, 'OVERDUE AGEING ANALYSIS', margin, y, W);
 
-    const cHeaders = ['CLUSTER', 'CASES', 'CLOSED', 'VOLUME', 'CHARGES', 'ROI%'];
-    const cWidths  = [38, 16, 16, 30, 28, 18];
-    const cContentW = cWidths.reduce((a, b) => a + b);
+    const aHeaders = ['AGE BUCKET', 'COUNT', 'OUTSTANDING (Rs)'];
+    const aWidths  = [50, 20, 50];
+    const aContentW = aWidths.reduce((a, b) => a + b, 0);
+    y = drawTableHeader(doc, aHeaders, aWidths, margin, y, aContentW);
 
-    doc.setFillColor(...NAVY);
-    doc.rect(margin, y, cContentW, 7, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    xPos = margin + 1;
-    cHeaders.forEach((h, i) => {
-      const align = i >= 1 ? 'right' : 'left';
-      doc.text(h, align === 'right' ? xPos + cWidths[i] - 2 : xPos, y + 5, { align });
-      xPos += cWidths[i];
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    const totalOverdueAmt = ageingRows.reduce((s, r) => s + r.outstanding, 0);
+    const totalOverdueCount = ageingRows.reduce((s, r) => s + r.count, 0);
+
+    ageingRows.forEach((r, idx) => {
+      if (r.count === 0) return;
+      y = checkPageBreak(doc, logoBase64, W, margin, y, 8);
+      if (idx % 2 === 0) { doc.setFillColor(245, 247, 252); doc.rect(margin, y - 3, aContentW, 6, 'F'); }
+      doc.setTextColor(30, 30, 50);
+      xPos = margin + 1;
+      [r.label, String(r.count), 'Rs ' + formatINR(r.outstanding)].forEach((cell, i) => {
+        const align = i >= 1 ? 'right' : 'left';
+        doc.text(cell, align === 'right' ? xPos + aWidths[i] - 2 : xPos, y, { align });
+        xPos += aWidths[i];
+      });
+      doc.setDrawColor(220, 225, 235);
+      doc.line(margin, y + 2, margin + aContentW, y + 2);
+      y += 6;
     });
-    y += 8;
+
+    if (totalOverdueCount > 0) {
+      y += 1;
+      doc.setFillColor(...NAVY);
+      doc.rect(margin, y, aContentW, 7, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      xPos = margin + 1;
+      ['TOTAL', String(totalOverdueCount), 'Rs ' + formatINR(totalOverdueAmt)].forEach((cell, i) => {
+        const align = i >= 1 ? 'right' : 'left';
+        doc.text(cell, align === 'right' ? xPos + aWidths[i] - 2 : xPos, y + 5, { align });
+        xPos += aWidths[i];
+      });
+      y += 12;
+    }
+
+    // ── 6. Cluster Summary (open cases) ──────────────────────
+    y += 4;
+    y = checkPageBreak(doc, logoBase64, W, margin, y, 60);
+    y = drawSectionHeader(doc, 'CLUSTER SUMMARY - OPEN CASES', margin, y, W);
+
+    const csHeaders = ['CLUSTER', 'CASES', 'PRINCIPAL', 'CHARGES', 'OUTSTANDING'];
+    const csWidths  = [38, 16, 28, 26, 30];
+    const csContentW = csWidths.reduce((a, b) => a + b, 0);
+    y = drawTableHeader(doc, csHeaders, csWidths, margin, y, csContentW);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(30, 30, 50);
 
-    clusterRows.forEach((c, idx) => {
-      if (idx % 2 === 0) {
-        doc.setFillColor(245, 247, 252);
-        doc.rect(margin, y - 3, cContentW, 6, 'F');
-      }
-      const roi = capitalDeployed > 0 ? ((c.charges / capitalDeployed) * 100).toFixed(2) : '0';
-      const rowData = [c.cluster, String(c.cases), String(c.closed), 'Rs ' + formatINR(c.volume), 'Rs ' + formatINR(c.charges), roi + '%'];
+    clusterSummaryRows.forEach((c, idx) => {
+      y = checkPageBreak(doc, logoBase64, W, margin, y, 8);
+      if (idx % 2 === 0) { doc.setFillColor(245, 247, 252); doc.rect(margin, y - 3, csContentW, 6, 'F'); }
+      const rowData = [c.cluster, String(c.count), 'Rs ' + formatINR(c.principal), 'Rs ' + formatINR(c.charges), 'Rs ' + formatINR(c.outstanding)];
       xPos = margin + 1;
       rowData.forEach((cell, i) => {
         const align = i >= 1 ? 'right' : 'left';
-        doc.text(cell, align === 'right' ? xPos + cWidths[i] - 2 : xPos, y, { align });
-        xPos += cWidths[i];
+        doc.text(cell, align === 'right' ? xPos + csWidths[i] - 2 : xPos, y, { align });
+        xPos += csWidths[i];
       });
       doc.setDrawColor(220, 225, 235);
-      doc.line(margin, y + 2, margin + cContentW, y + 2);
+      doc.line(margin, y + 2, margin + csContentW, y + 2);
       y += 6;
     });
 
-    // Timestamp
+    // ── 7. Open Cases Table ───────────────────────────────────
+    y += 6;
+    y = checkPageBreak(doc, logoBase64, W, margin, y, 50);
+    y = drawSectionHeader(doc, 'OPEN CASES - ALL CLUSTERS', margin, y, W);
+
+    const ocHeaders = ['DATE', 'CUSTOMER', 'CLUSTER/BRANCH', 'PRINCIPAL', 'CHARGES', 'OUTSTANDING', 'DAYS'];
+    const ocWidths  = [18, 35, 30, 22, 20, 24, 14];
+    const ocContentW = ocWidths.reduce((a, b) => a + b, 0);
+    y = drawTableHeader(doc, ocHeaders, ocWidths, margin, y, ocContentW);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(30, 30, 50);
+
+    openCases.forEach((l, idx) => {
+      y = checkPageBreak(doc, logoBase64, W, margin, y, 7);
+      if (idx % 2 === 0) { doc.setFillColor(245, 247, 252); doc.rect(margin, y - 3, ocContentW, 5.5, 'F'); }
+      const dateStr = l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM') : '-';
+      const clBr = [l.cluster, l.branch].filter(Boolean).join('/') || '-';
+      const rowData = [dateStr, l.borrower_name || '-', clBr, 'Rs ' + formatINR(l.principal), 'Rs ' + formatINR(l._charges), 'Rs ' + formatINR(l._outstanding), String(l._days)];
+      xPos = margin + 1;
+      rowData.forEach((cell, i) => {
+        const align = i >= 1 ? 'right' : 'left';
+        const cellText = doc.splitTextToSize(cell, i === 1 ? ocWidths[i] - 2 : ocWidths[i] - 1)[0];
+        doc.text(cellText, align === 'right' ? xPos + ocWidths[i] - 2 : xPos, y, { align });
+        xPos += ocWidths[i];
+      });
+      doc.setDrawColor(220, 225, 235);
+      doc.line(margin, y + 2, margin + ocContentW, y + 2);
+      y += 5.5;
+    });
+
+    // Open cases total row
+    if (openCases.length > 0) {
+      y += 1;
+      doc.setFillColor(...NAVY);
+      doc.rect(margin, y, ocContentW, 7, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      const ocTotPrincipal = openCases.reduce((s, l) => s + (l.principal || 0), 0);
+      const ocTotCharges   = openCases.reduce((s, l) => s + l._charges, 0);
+      const ocTotOut       = openCases.reduce((s, l) => s + l._outstanding, 0);
+      const totRowData = [`TOTAL (${openCases.length})`, '', '', 'Rs ' + formatINR(ocTotPrincipal), 'Rs ' + formatINR(ocTotCharges), 'Rs ' + formatINR(ocTotOut), ''];
+      xPos = margin + 1;
+      totRowData.forEach((cell, i) => {
+        const align = i >= 1 ? 'right' : 'left';
+        if (cell) doc.text(cell, align === 'right' ? xPos + ocWidths[i] - 2 : xPos, y + 5, { align });
+        xPos += ocWidths[i];
+      });
+      y += 12;
+    }
+
+    // ── 8. Cluster Analytics (all-time / YTD basis) ───────────
     y += 4;
+    y = checkPageBreak(doc, logoBase64, W, margin, y, 60);
+    y = drawSectionHeader(doc, `CLUSTER ANALYTICS - ${reportType.toUpperCase()}`, margin, y, W);
+
+    const caHeaders = ['CLUSTER', 'CASES', 'CL.', 'VOLUME', 'CHARGES', 'AVG TAT', 'ROI%'];
+    const caWidths  = [36, 14, 14, 28, 26, 18, 16];
+    const caContentW = caWidths.reduce((a, b) => a + b, 0);
+    y = drawTableHeader(doc, caHeaders, caWidths, margin, y, caContentW);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(30, 30, 50);
+
+    analyticsRows.forEach((c, idx) => {
+      y = checkPageBreak(doc, logoBase64, W, margin, y, 8);
+      if (idx % 2 === 0) { doc.setFillColor(245, 247, 252); doc.rect(margin, y - 3, caContentW, 6, 'F'); }
+      const roi = capitalDeployed > 0 ? ((c.charges / capitalDeployed) * 100).toFixed(2) : '0';
+      const tat = avgTAT(c.loans);
+      const rowData = [c.cluster, String(c.cases), String(c.closed), 'Rs ' + formatINR(c.principal), 'Rs ' + formatINR(c.charges), tat, roi + '%'];
+      xPos = margin + 1;
+      rowData.forEach((cell, i) => {
+        const align = i >= 1 ? 'right' : 'left';
+        doc.text(cell, align === 'right' ? xPos + caWidths[i] - 2 : xPos, y, { align });
+        xPos += caWidths[i];
+      });
+      doc.setDrawColor(220, 225, 235);
+      doc.line(margin, y + 2, margin + caContentW, y + 2);
+      y += 6;
+    });
+
+    // ── Timestamp ─────────────────────────────────────────────
+    y += 6;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 160);

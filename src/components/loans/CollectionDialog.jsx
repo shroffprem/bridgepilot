@@ -57,10 +57,13 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
         // The real UTR is always the LAST hyphen-separated segment (longest alphanumeric token)
         let utr = null;
 
-        // 1. Try last segment after hyphen (handles bank credit note format)
-        const lastSegmentMatch = text.match(/-([A-Z0-9]{10,})(?:\s|$)/i);
-        if (lastSegmentMatch) {
-          utr = lastSegmentMatch[1];
+        // 1. Try the very last hyphen-separated segment (bank credit note format)
+        // e.g. "RTGS Cr-IOBA0000971-VIJAYA-BRIDGELINE PARTNERS-IOBAR52026051600616422"
+        // Split on hyphens, take the last token (trim whitespace/newlines)
+        const segments = text.split('-');
+        const lastSeg = segments[segments.length - 1].trim().split(/\s/)[0];
+        if (lastSeg && lastSeg.length >= 10 && /^[A-Z0-9]+$/i.test(lastSeg)) {
+          utr = lastSeg;
         }
 
         // 2. Fallback: standard UTR pattern (22-char alphanumeric)

@@ -29,7 +29,13 @@ function SectionHeader({ title }) {
   );
 }
 
+const COMPANIES = [
+  'HDB Financials',
+  'ICICI Bank',
+];
+
 const EMPTY_FORM = {
+  company: '',
   borrower_name: '',
   customer_mobile: '',
   principal: '',
@@ -122,6 +128,20 @@ export default function LoanForm() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <SmartPasteBox onParsed={merge} />
+
+          {/* Company */}
+          <SectionHeader title="Partner Company" />
+          <Field label="Company / Lender" required>
+            <select
+              className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              value={form.company}
+              onChange={set('company')}
+              required
+            >
+              <option value="">Select company…</option>
+              {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Field>
 
           {/* Customer */}
           <SectionHeader title="Customer Details" />

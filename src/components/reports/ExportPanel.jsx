@@ -16,6 +16,7 @@ function fmtINR(n) {
 
 function loanRows(loans) {
   return loans.map(l => ({
+    'Company':           l.company || '',
     'Disbursal ID':      l.disbursal_id || '',
     'Loan #':            l.loan_number || '',
     'Date':              l.disbursement_date || '',
@@ -115,7 +116,8 @@ async function buildPDF(loans, collections, filterLabel) {
 
   // Column definitions with explicit widths (landscape A4 = 297mm, content = 273mm)
   const LOAN_DEFS = [
-    { key: 'Disbursal ID',    w: 28 },
+    { key: 'Company',         w: 26 },
+    { key: 'Disbursal ID',    w: 24 },
     { key: 'Date',            w: 20 },
     { key: 'Borrower',        w: 38 },
     { key: 'Branch',          w: 24 },
@@ -261,6 +263,8 @@ async function buildPDF(loans, collections, filterLabel) {
   return doc;
 }
 
+const COMPANIES = ['HDB Financials', 'ICICI Bank'];
+
 // ── Component ─────────────────────────────────────────────────
 export default function ExportPanel() {
   const [allLoans, setAllLoans] = useState([]);
@@ -270,6 +274,7 @@ export default function ExportPanel() {
   const [loading, setLoading] = useState(null);
 
   // Filters
+  const [company, setCompany] = useState('all');
   const [cluster, setCluster] = useState('all');
   const [datePreset, setDatePreset] = useState('current'); // current | previous | custom | all
   const [customFrom, setCustomFrom] = useState('');
@@ -300,6 +305,13 @@ export default function ExportPanel() {
     let filteredLoans = loans;
     let filteredCols = cols;
 
+    if (company !== 'all') {
+      filteredLoans = filteredLoans.filter(l => l.company === company);
+      // collections don't have company directly — filter via loan_number cross-reference
+      const matchedNumbers = new Set(filteredLoans.map(l => l.loan_number));
+      filteredCols = filteredCols.filter(c => matchedNumbers.has(c.loan_number));
+    }
+
     if (cluster !== 'all') {
       filteredLoans = filteredLoans.filter(l => l.cluster === cluster);
       filteredCols = filteredCols.filter(c => c.cluster === cluster);
@@ -314,7 +326,8 @@ export default function ExportPanel() {
   }
 
   function filterLabel() {
-    const cl = cluster === 'all' ? 'All Clusters' : cluster;
+    const co = company === 'all' ? 'All Companies' : company;
+    const cl = cluster === 'all' ? `${co}` : `${co} · ${cluster}`;
     let dt = '';
     if (datePreset === 'current') dt = format(new Date(), 'MMM yyyy');
     else if (datePreset === 'previous') dt = format(subMonths(new Date(), 1), 'MMM yyyy');
@@ -355,6 +368,15 @@ export default function ExportPanel() {
         </div>
 
         <div className="flex flex-wrap gap-3 items-end">
+          {/* Company */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">Company</label>
+            <select className={selectCls} value={company} onChange={e => setCompany(e.target.value)}>
+              <option value="all">All Companies</option>
+              {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
           {/* Cluster */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">Cluster</label>

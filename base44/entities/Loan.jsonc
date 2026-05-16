@@ -2,6 +2,10 @@
   "name": "Loan",
   "type": "object",
   "properties": {
+    "company": {
+      "type": "string",
+      "description": "Partner company / lender (e.g. HDB Financials, ICICI Bank)"
+    },
     "loan_number": {
       "type": "string",
       "description": "Unique case reference number"

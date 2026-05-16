@@ -45,6 +45,7 @@ export default function Loans() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [companyFilter, setCompanyFilter] = useState('all');
   const [clusterFilter, setClusterFilter] = useState('all');
   const [soFilter, setSoFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
@@ -67,9 +68,11 @@ export default function Loans() {
 
   const clusters = [...new Set(loans.map(l => l.cluster).filter(Boolean))].sort();
   const soNames = [...new Set(loans.map(l => l.so_name).filter(Boolean))].sort();
+  const companies = [...new Set(loans.map(l => l.company).filter(Boolean))].sort();
 
   const filtered = loans.filter(l => {
     const matchStatus = statusFilter === 'all' || l.status === statusFilter;
+    const matchCompany = companyFilter === 'all' || l.company === companyFilter;
     const matchCluster = clusterFilter === 'all' || l.cluster === clusterFilter;
     const matchSO = soFilter === 'all' || l.so_name === soFilter;
     const matchDateFrom = !dateFrom || (l.disbursement_date && l.disbursement_date >= dateFrom);
@@ -81,11 +84,11 @@ export default function Loans() {
       (l.branch || '').toLowerCase().includes(q) ||
       (l.cluster || '').toLowerCase().includes(q) ||
       (l.so_name || '').toLowerCase().includes(q);
-    return matchStatus && matchCluster && matchSO && matchDateFrom && matchDateTo && matchSearch;
+    return matchStatus && matchCompany && matchCluster && matchSO && matchDateFrom && matchDateTo && matchSearch;
   });
 
-  const hasFilters = clusterFilter !== 'all' || soFilter !== 'all' || dateFrom || dateTo;
-  const clearFilters = () => { setClusterFilter('all'); setSoFilter('all'); setDateFrom(''); setDateTo(''); };
+  const hasFilters = companyFilter !== 'all' || clusterFilter !== 'all' || soFilter !== 'all' || dateFrom || dateTo;
+  const clearFilters = () => { setCompanyFilter('all'); setClusterFilter('all'); setSoFilter('all'); setDateFrom(''); setDateTo(''); };
 
   const statusCounts = loans.reduce((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
@@ -147,6 +150,15 @@ export default function Loans() {
           />
         </div>
         <div className="flex flex-wrap gap-2 items-center">
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-40 h-8 text-xs">
+              <SelectValue placeholder="Company" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Select value={clusterFilter} onValueChange={setClusterFilter}>
             <SelectTrigger className="w-36 h-8 text-xs">
               <SelectValue placeholder="Cluster" />
@@ -197,7 +209,10 @@ export default function Loans() {
                   <td className="px-2 py-2 text-muted-foreground">{i + 1}</td>
                   <td className="px-2 py-2 text-muted-foreground whitespace-nowrap">{l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM') : '—'}</td>
                   <td className="px-2 py-2 font-medium max-w-[150px] truncate">{l.borrower_name}</td>
-                  <td className="px-2 py-2 text-muted-foreground">{[l.cluster, l.branch].filter(Boolean).join(' / ') || '—'}</td>
+                  <td className="px-2 py-2 text-muted-foreground">
+                    {[l.cluster, l.branch].filter(Boolean).join(' / ') || '—'}
+                    {l.company && <div className="text-xs text-primary/70 font-medium">{l.company}</div>}
+                  </td>
                   <td className="px-2 py-2 text-right font-semibold">{formatINR(l.principal)}</td>
                   <td className="px-2 py-2 text-right text-muted-foreground">{formatINR(charges)}</td>
                   <td className={`px-2 py-2 text-right font-semibold ${l.status === 'overdue' ? 'text-red-600' : ''}`}>{formatINR(outstanding)}</td>
@@ -228,6 +243,7 @@ export default function Loans() {
                 <div>
                   <div className="font-semibold text-foreground text-sm">{l.borrower_name}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{l.branch || '—'} · {l.cluster || '—'}</div>
+                  {l.company && <div className="text-xs text-primary/70 font-medium mt-0.5">{l.company}</div>}
                 </div>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[l.status] || 'bg-gray-100 text-gray-600'}`}>
                   {STATUS_LABELS[l.status] || l.status}

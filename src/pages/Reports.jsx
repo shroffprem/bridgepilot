@@ -62,6 +62,7 @@ export default function Reports() {
   const [disbursals, setDisbursals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(null);
+  const [activeTab, setActiveTab] = useState('mis');
 
   useEffect(() => {
     Promise.all([
@@ -81,12 +82,33 @@ export default function Reports() {
     try {
       const res = await base44.functions.invoke('generateConsolidatedMIS', {});
       if (res && res.data) {
-        // Create blob from response
         const blob = new Blob([res.data], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.download = `BridgeLine-MIS-${format(new Date(), 'yyyyMMdd')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+    setDownloading(null);
+  };
+
+  const downloadDashboardReport = async (period) => {
+    const key = `dashboard_${period}`;
+    setDownloading(key);
+    try {
+      const res = await base44.functions.invoke('generateDashboardReportPDF', { reportType: period });
+      if (res && res.data) {
+        const blob = new Blob([res.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `BridgeLine-Dashboard-${period.toUpperCase()}-${format(new Date(), 'yyyyMMdd')}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -220,34 +242,101 @@ export default function Reports() {
   const clusterData = Object.values(clusterMap).sort((a, b) => b.principal - a.principal);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
 
-      {/* ── Download Section ── */}
-      <div className="bg-card rounded-xl border border-border p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-syne font-bold text-sm">Report Downloads</h3>
-            <p className="text-xs text-muted-foreground mt-1">Export data as PDF</p>
-          </div>
-          <div className="flex gap-2 flex-wrap justify-end">
+      {/* ── Tab bar ── */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="flex items-center px-5 pt-4 pb-0 border-b border-border gap-0">
+          {[
+            { key: 'mis', label: 'Consolidated MIS' },
+            { key: 'dashboard', label: 'Dashboard Reports' },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all ${
+                activeTab === key
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Consolidated MIS tab */}
+        {activeTab === 'mis' && (
+          <div className="p-5 flex items-center justify-between">
+            <div>
+              <h3 className="font-syne font-bold text-sm">Consolidated MIS Report</h3>
+              <p className="text-xs text-muted-foreground mt-1">All open cases across all clusters on letterhead</p>
+            </div>
             <Button
               size="sm"
               variant="outline"
               className="gap-2"
               onClick={() => downloadReport('consolidated_mis')}
-              disabled={downloading}
+              disabled={!!downloading}
             >
-              {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              {downloading ? 'Generating...' : 'Download MIS Report'}
+              {downloading === 'consolidated_mis' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {downloading === 'consolidated_mis' ? 'Generating...' : 'Download MIS Report'}
             </Button>
           </div>
-        </div>
+        )}
+
+        {/* Dashboard Reports tab */}
+        {activeTab === 'dashboard' && (
+          <div className="p-5">
+            <div className="mb-4">
+              <h3 className="font-syne font-bold text-sm">Dashboard Performance Reports</h3>
+              <p className="text-xs text-muted-foreground mt-1">Portfolio overview on BridgeLine letterhead — same layout as the dashboard</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* MTD Card */}
+              <div className="border border-border rounded-xl p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-semibold text-sm">MTD Report</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {format(new Date(), 'MMMM yyyy')} — month-wise breakdown, goalpost & cluster analytics
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 shrink-0"
+                  onClick={() => downloadDashboardReport('mtd')}
+                  disabled={!!downloading}
+                >
+                  {downloading === 'dashboard_mtd' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  {downloading === 'dashboard_mtd' ? 'Generating...' : 'Download MTD'}
+                </Button>
+              </div>
+
+              {/* YTD Card */}
+              <div className="border border-border rounded-xl p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-semibold text-sm">YTD Report</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {new Date().getFullYear()} — all months breakdown & cluster analytics
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 shrink-0"
+                  onClick={() => downloadDashboardReport('ytd')}
+                  disabled={!!downloading}
+                >
+                  {downloading === 'dashboard_ytd' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  {downloading === 'dashboard_ytd' ? 'Generating...' : 'Download YTD'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-
-
-
-
-      </div>
-      );
-      }
+    </div>
+  );
+  }

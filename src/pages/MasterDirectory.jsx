@@ -36,7 +36,7 @@ const COMPANY_TYPE_LABELS = {
 };
 
 // ─── Default form states ───────────────────────────────────────────
-const defaultMember = { full_name: '', role: 'branch_manager', employee_id: '', phone: '', email: '', zone: '', cluster: '', branch: '', reports_to: '', joined_date: '', status: 'active', notes: '' };
+const defaultMember = { full_name: '', role: 'branch_manager', employee_id: '', phone: '', email: '', zone: '', cluster: '', branch: '', reports_to: '', company_id: '', joined_date: '', status: 'active', notes: '' };
 const defaultCompany = { name: '', type: 'lender', cin: '', gstin: '', registered_address: '', operational_address: '', website: '', primary_contact_name: '', primary_contact_phone: '', primary_contact_email: '', notes: '' };
 
 // ─── Access guard ─────────────────────────────────────────────────
@@ -124,6 +124,7 @@ function TeamTab({ companies }) {
                 <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Phone</th>
                 <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Email</th>
                 <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Branch / Zone</th>
+                <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Company</th>
                 <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Status</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -141,6 +142,9 @@ function TeamTab({ companies }) {
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{m.email || '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">
                     {[m.branch, m.cluster, m.zone].filter(Boolean).join(' · ') || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">
+                    {companyName(m.company_id)}
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[m.status] || ''}`}>{m.status}</span>
@@ -175,6 +179,16 @@ function TeamTab({ companies }) {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(ROLE_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Company</Label>
+              <Select value={form.company_id || ''} onValueChange={v => setForm(f => ({ ...f, company_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={null}>— None —</SelectItem>
+                  {companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

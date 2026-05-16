@@ -92,7 +92,8 @@ export default function LoanForm() {
     setSaving(true);
     const ts = Date.now().toString().slice(-8);
     const loanNumber = `BLP-${ts}`;
-    const disbursalId = `DIS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${ts}`;
+    const dateStr = format(new Date(), 'ddMMyy');
+    const disbursalId = `BLP/${dateStr}/${ts}`;
     await base44.entities.Loan.create({
       ...form,
       principal,

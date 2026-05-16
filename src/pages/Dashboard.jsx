@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
 import { format, endOfMonth, differenceInDays, getYear } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatINR, formatINRFull, calcCharges, calcGST, calcOutstanding, clusterSummary, monthlyBreakdown, calcROI, avgTAT } from '@/lib/mis';
 import { Target } from 'lucide-react';
 import OverdueAgeing from '@/components/dashboard/OverdueAgeing';
@@ -103,12 +102,6 @@ export default function Dashboard() {
 
   // Monthly breakdown for chart (always all-time for chart context)
   const monthly = monthlyBreakdown(loans);
-  const chartData = monthly.map(m => ({
-    month: m.month,
-    Volume: Math.round(m.volume / 100000),
-    Charges: Math.round(m.charges / 1000),
-  }));
-
   // Month-wise breakdown for active tab
   const activeMonthly = portfolioTab === 'mtd'
     ? monthly.filter(m => m.month === currentMonth)
@@ -346,7 +339,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Section 5: Cluster Analytics YTD + Month-wise ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div>
         {/* Cluster Analytics YTD */}
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
@@ -386,23 +379,7 @@ export default function Dashboard() {
           </table>
         </div>
 
-        {/* Month-wise Volume chart */}
-        <div className="bg-card rounded-xl border border-border p-5">
-          <h3 className="font-syne font-semibold text-sm mb-4">Monthly Volume (₹L) & Charges (₹K)</h3>
-          {chartData.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data yet</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} barGap={2}>
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(v, n) => [n === 'Volume' ? `₹${v}L` : `₹${v}K`, n]} />
-                <Bar dataKey="Volume" fill="hsl(var(--primary))" radius={[3,3,0,0]} />
-                <Bar dataKey="Charges" fill="hsl(var(--success))" radius={[3,3,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+
       </div>
 
 

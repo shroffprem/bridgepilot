@@ -10,11 +10,16 @@ const LOGO_URL = 'https://media.base44.com/images/public/6a056f02e19305d21d34b21
 async function fetchLogoBase64() {
   try {
     const res = await fetch(LOGO_URL);
+    if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return 'data:image/png;base64,' + btoa(binary);
+    // Use Deno's built-in base64 encoder to handle large buffers correctly
+    const CHUNK = 8192;
+    let base64 = '';
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      base64 += btoa(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+    }
+    return 'data:image/png;base64,' + base64;
   } catch { return null; }
 }
 
@@ -24,48 +29,48 @@ function drawLetterhead(doc, logoBase64, W, margin) {
   doc.setFillColor(...NAVY);
   doc.rect(0, 0, W, 42, 'F');
 
-  if (logoBase64) doc.addImage(logoBase64, 'PNG', margin, 5, 26, 26);
+  if (logoBase64) doc.addImage(logoBase64, 'PNG', margin, 7, 24, 24);
 
+  // Brand name — left side, vertically centered in header
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  const logoRight = logoBase64 ? margin + 29 : margin;
-  doc.text('BridgeLine', logoRight, 25);
+  doc.setFontSize(14);
+  const logoRight = margin + 27;
+  doc.text('BridgeLine', logoRight, 22);
   const blW = doc.getTextWidth('BridgeLine');
   doc.setFont('helvetica', 'normal');
-  doc.text('Partners', logoRight + blW + 1, 25);
+  doc.text('Partners', logoRight + blW + 1.5, 22);
 
+  // Right side contact block — no charSpace (causes truncation), use plain labels
   const rx = W - margin;
+
+  // ADDRESS
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setTextColor(...GOLD);
-  doc.setCharSpace(1.5);
-  doc.text('A D D R E S S', rx, 9, { align: 'right' });
-  doc.setCharSpace(0);
+  doc.text('ADDRESS', rx, 8, { align: 'right' });
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.setTextColor(255, 255, 255);
-  doc.text('2nd Floor, 3282/1, Apt No 5, Ashraya Residency,', rx, 14, { align: 'right' });
-  doc.text('Vijaynagar 3rd Stage, E Block, Garudachar Layout,', rx, 18.5, { align: 'right' });
-  doc.text('Mysuru, Karnataka \u2013 570030', rx, 23, { align: 'right' });
+  doc.text('2nd Floor, 3282/1, Apt No 5, Ashraya Residency,', rx, 13, { align: 'right' });
+  doc.text('Vijaynagar 3rd Stage, E Block, Garudachar Layout,', rx, 17.5, { align: 'right' });
+  doc.text('Mysuru, Karnataka - 570030', rx, 22, { align: 'right' });
 
+  // CONTACT
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setTextColor(...GOLD);
-  doc.setCharSpace(1.5);
-  doc.text('C O N T A C T', rx, 28.5, { align: 'right' });
-  doc.setCharSpace(0);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
+  doc.text('CONTACT', rx, 27.5, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
   doc.setTextColor(255, 255, 255);
-  doc.text('+91 96862 88166  \u00B7  +91 98451 22023', rx, 33.5, { align: 'right' });
+  doc.text('+91 96862 88166  |  +91 98451 22023', rx, 32.5, { align: 'right' });
 
+  // GSTIN
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setTextColor(...GOLD);
-  doc.setCharSpace(1.5);
-  doc.text('G S T I N', rx, 38.5, { align: 'right' });
-  doc.setCharSpace(0);
+  doc.text('GSTIN', rx, 38, { align: 'right' });
 
   doc.setDrawColor(...GOLD);
   doc.setLineWidth(0.6);
@@ -210,7 +215,7 @@ Deno.serve(async (req) => {
     const todayStr = format(today, 'dd-MMM-yyyy');
     const periodLabel = reportType === 'mtd'
       ? format(today, 'MMMM yyyy')
-      : `January – December ${currentYear}`;
+      : `January - December ${currentYear}`;
 
     // ── Page 1 ─────────────────────────────────────────────────────
     drawLetterhead(doc, logoBase64, W, margin);
@@ -228,14 +233,14 @@ Deno.serve(async (req) => {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text(`PORTFOLIO OVERVIEW — ${reportType.toUpperCase()}  (${periodLabel})`, margin + 4, y + 7);
+    doc.text(`PORTFOLIO OVERVIEW - ${reportType.toUpperCase()}  (${periodLabel})`, margin + 4, y + 7);
     doc.setFontSize(8);
     doc.text(`As of ${todayStr}`, W - margin - 2, y + 7, { align: 'right' });
     y += 14;
 
     // KPI boxes
     const kpis = [
-      { label: 'CASES DISBURSED', value: `${totalCases}  (${totalOpen} open · ${totalClosed} closed)` },
+      { label: 'CASES DISBURSED', value: `${totalCases}  (${totalOpen} open / ${totalClosed} closed)` },
       { label: 'TOTAL DISBURSED', value: 'Rs ' + formatINR(totalVolume) },
       { label: 'CHARGES EARNED', value: 'Rs ' + formatINR(totalCharges) },
       { label: 'OUTSTANDING', value: 'Rs ' + formatINR(totalOutstanding) },
@@ -344,7 +349,7 @@ Deno.serve(async (req) => {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...NAVY);
-      doc.text(`MONTHLY ROI GOALPOST — ${format(today, 'MMM yyyy')}  (4% of deployed capital)`, margin, y);
+      doc.text(`MONTHLY ROI GOALPOST - ${format(today, 'MMM yyyy')}  (4% of deployed capital)`, margin, y);
       y += 5;
 
       // Progress bar
@@ -399,7 +404,7 @@ Deno.serve(async (req) => {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...NAVY);
-    doc.text(`CLUSTER ANALYTICS — ${reportType.toUpperCase()}`, margin, y);
+    doc.text(`CLUSTER ANALYTICS - ${reportType.toUpperCase()}`, margin, y);
     y += 5;
 
     const cHeaders = ['CLUSTER', 'CASES', 'CLOSED', 'VOLUME', 'CHARGES', 'ROI%'];

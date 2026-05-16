@@ -77,8 +77,7 @@ export default function Dashboard() {
     const collected = set.filter(l => l.status === 'closed').reduce((s, l) => s + (l.principal || 0) + calcCharges(l), 0);
     const closed = set.filter(l => l.status === 'closed').length;
     const open = set.filter(l => l.status === 'open' || l.status === 'overdue').length;
-    const roi = volume > 0 ? ((charges / volume) * 100).toFixed(3) : '0';
-    return { volume, charges, gst, outstanding, collected, closed, open, roi, cases: set.length };
+    return { volume, charges, gst, outstanding, collected, closed, open, cases: set.length };
   }
 
   const mtd = summaryOf(mtdLoans);
@@ -186,7 +185,7 @@ export default function Dashboard() {
               {activeMonthly.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-6 text-muted-foreground">No data for this period</td></tr>
               ) : activeMonthly.map(m => {
-                const roi = m.volume > 0 ? ((m.charges / m.volume) * 100).toFixed(2) : '0';
+                const roi = capitalDeployed > 0 ? ((m.charges / capitalDeployed) * 100).toFixed(2) : '0';
                 const isCurrent = m.month === currentMonth;
                 return (
                   <tr key={m.month} className={`border-t border-border ${isCurrent ? 'bg-accent/20 font-semibold' : 'hover:bg-muted/30'}`}>
@@ -208,7 +207,7 @@ export default function Dashboard() {
                 collected: s.collected + m.collected, outstanding: s.outstanding + m.outstanding,
                 closed: s.closed + m.closed, open: s.open + m.open,
               }), { cases: 0, volume: 0, charges: 0, collected: 0, outstanding: 0, closed: 0, open: 0 });
-              const roi = tot.volume > 0 ? ((tot.charges / tot.volume) * 100).toFixed(2) : '0';
+              const roi = capitalDeployed > 0 ? ((tot.charges / capitalDeployed) * 100).toFixed(2) : '0';
               return (
                 <tfoot>
                   <tr className="border-t-2 border-border bg-muted/60 font-bold text-xs">
@@ -368,7 +367,7 @@ export default function Dashboard() {
             <tbody>
               {clusters.map((c, i) => {
                 const tat = avgTAT(c.loans);
-                const roi = calcROI(c.principal, c.charges);
+                const roi = calcROI(capitalDeployed, c.charges);
                 return (
                   <tr key={c.cluster} className="border-t border-border">
                     <td className="px-3 py-2 font-medium">

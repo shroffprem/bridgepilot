@@ -36,10 +36,10 @@ export function calcOutstanding(loan) {
   return (loan.principal || 0) + charges + calcGST(charges);
 }
 
-// ROI = charges / principal (%)
-export function calcROI(principal, charges) {
-  if (!principal) return 0;
-  return (charges / principal) * 100;
+// ROI = charges / capitalDeployed (%)
+export function calcROI(capitalDeployed, charges) {
+  if (!capitalDeployed) return 0;
+  return (charges / capitalDeployed) * 100;
 }
 
 // Average TAT for a set of loans (days from disbursement to closure)

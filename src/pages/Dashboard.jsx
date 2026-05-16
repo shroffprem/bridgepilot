@@ -75,7 +75,7 @@ export default function Dashboard() {
     const outstanding = set.filter(l => l.status !== 'closed').reduce((s, l) => s + calcOutstanding(l), 0);
     const collected = set.filter(l => l.status === 'closed').reduce((s, l) => s + (l.principal || 0) + calcCharges(l), 0);
     const closed = set.filter(l => l.status === 'closed').length;
-    const open = set.filter(l => l.status === 'open' || l.status === 'overdue').length;
+    const open = set.filter(l => l.status !== 'closed').length;
     return { volume, charges, gst, outstanding, collected, closed, open, cases: set.length };
   }
 

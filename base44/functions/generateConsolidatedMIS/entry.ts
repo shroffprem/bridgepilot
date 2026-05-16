@@ -2,20 +2,112 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { jsPDF } from 'npm:jspdf@4.2.1';
 import { format, differenceInDays } from 'npm:date-fns@3.6.0';
 
+// ── BridgeLine Partners brand constants ──────────────────────
+const NAVY = [26, 39, 68];
+const GOLD = [201, 168, 76];
+const LOGO_URL = 'https://media.base44.com/images/public/6a056f02e19305d21d34b219/fa91ede9e_BLPLogo.png';
+
+async function fetchLogoBase64() {
+  try {
+    const res = await fetch(LOGO_URL);
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return 'data:image/png;base64,' + btoa(binary);
+  } catch { return null; }
+}
+
+// Draw the BridgeLine Partners letterhead header + gold divider + footer on current page
+function drawLetterhead(doc, logoBase64, W, margin) {
+  const pageH = doc.internal.pageSize.height;
+
+  // Navy header block
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, W, 42, 'F');
+
+  // Logo
+  if (logoBase64) doc.addImage(logoBase64, 'PNG', margin, 5, 26, 26);
+
+  // "BridgeLine" bold white + "Partners" regular white
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  const logoRight = logoBase64 ? margin + 29 : margin;
+  doc.text('BridgeLine', logoRight, 25);
+  const blW = doc.getTextWidth('BridgeLine');
+  doc.setFont('helvetica', 'normal');
+  doc.text('Partners', logoRight + blW + 1, 25);
+
+  // Right: ADDRESS / CONTACT / GSTIN labels in gold, values in white
+  const rx = W - margin;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GOLD);
+  doc.setCharSpace(1.5);
+  doc.text('A D D R E S S', rx, 9, { align: 'right' });
+  doc.setCharSpace(0);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+  doc.text('2nd Floor, 3282/1, Apt No 5, Ashraya Residency,', rx, 14, { align: 'right' });
+  doc.text('Vijaynagar 3rd Stage, E Block, Garudachar Layout,', rx, 18.5, { align: 'right' });
+  doc.text('Mysuru, Karnataka \u2013 570030', rx, 23, { align: 'right' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GOLD);
+  doc.setCharSpace(1.5);
+  doc.text('C O N T A C T', rx, 28.5, { align: 'right' });
+  doc.setCharSpace(0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+  doc.text('+91 96862 88166  \u00B7  +91 98451 22023', rx, 33.5, { align: 'right' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GOLD);
+  doc.setCharSpace(1.5);
+  doc.text('G S T I N', rx, 38.5, { align: 'right' });
+  doc.setCharSpace(0);
+
+  // Gold divider line below header
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.6);
+  doc.line(margin, 43.5, W - margin, 43.5);
+  doc.setLineWidth(0.2);
+
+  // Footer gold divider + wordmark
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.6);
+  doc.line(margin, pageH - 14, W - margin, pageH - 14);
+  doc.setLineWidth(0.2);
+
+  // Footer: "BridgeLine" navy bold + "Partners" gold
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...NAVY);
+  const bText = 'BridgeLine';
+  const pText = 'Partners';
+  const bW2 = doc.getTextWidth(bText);
+  const pW = doc.getTextWidth(pText);
+  const totalFW = bW2 + pW + 0.5;
+  const footerX = W / 2;
+  doc.text(bText, footerX - totalFW / 2, pageH - 8);
+  doc.setTextColor(...GOLD);
+  doc.text(pText, footerX - totalFW / 2 + bW2 + 0.5, pageH - 8);
+}
+
 function calcCharges(l) {
   return l.charges != null ? l.charges : (l.principal || 0) * (l.rate || 0.5) / 100;
 }
-
-function calcGST(charges) {
-  return charges * 0.18;
-}
-
+function calcGST(charges) { return charges * 0.18; }
 function calcOutstanding(l) {
   const charges = calcCharges(l);
   const gst = l.gst != null ? l.gst : calcGST(charges);
   return (l.principal || 0) + charges + gst;
 }
-
 function formatINR(n) {
   if (!n) return '0';
   return Math.round(n).toLocaleString('en-IN');
@@ -29,107 +121,100 @@ Deno.serve(async (req) => {
 
     const loans = await base44.entities.Loan.list();
     const openLoans = loans.filter(l => l.status === 'open' || l.status === 'Follow Up!' || l.status === 'follow_up');
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
-    let yPos = 15;
-
-    // Set font
-    doc.setFont('Helvetica');
-
-    // Title
-    doc.setFontSize(16);
-    doc.setFont('Helvetica', 'bold');
-    doc.text('Consolidated MIS Report - All Clusters', 15, yPos);
-    yPos += 8;
-
-    // Header info
-    doc.setFontSize(9);
-    doc.setFont('Helvetica', 'normal');
-    doc.text('REPORTING DATE', 15, yPos);
-    doc.text(format(new Date(), 'dd-MMM-yyyy'), 50, yPos);
-    yPos += 5;
-
-    doc.text('ADDRESS', 15, yPos);
-    doc.text('2nd Floor, 3282/1, Apt 5, Ashraya Residency', 50, yPos);
-    yPos += 4;
-    doc.text('Vijaynagar 3rd Stage E Block, Mysuru 570030', 50, yPos);
-    yPos += 5;
-
-    doc.text('CONTACT', 15, yPos);
-    doc.text('+91 99862 88166 | +91 98451 22023', 50, yPos);
-    yPos += 5;
-
-    doc.text('GSTIN', 15, yPos);
-    doc.text('29ABGFB6346P1ZR', 50, yPos);
-    yPos += 10;
-
-    // KPI section
-    const totalPrincipal = openLoans.reduce((s, l) => s + (l.principal || 0), 0);
-    const totalOutstanding = openLoans.reduce((s, l) => s + calcOutstanding(l), 0);
-
-    doc.setFillColor(220, 220, 220);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
-
-    const kpiWidth = 35;
-    const kpiX = [15, 15 + kpiWidth + 5, 15 + (kpiWidth + 5) * 2];
-    doc.rect(kpiX[0], yPos, kpiWidth, 12, 'F');
-    doc.text('OPEN CASES', kpiX[0] + 2, yPos + 4);
-    doc.setFontSize(14);
-    doc.text(String(openLoans.length), kpiX[0] + 2, yPos + 10);
-
-    doc.setFontSize(9);
-    doc.rect(kpiX[1], yPos, kpiWidth, 12, 'F');
-    doc.text('TOTAL PRINCIPAL', kpiX[1] + 2, yPos + 4);
-    doc.setFontSize(10);
-    doc.text('Rs ' + formatINR(totalPrincipal), kpiX[1] + 2, yPos + 10);
-
-    doc.setFontSize(9);
-    doc.rect(kpiX[2], yPos, kpiWidth, 12, 'F');
-    doc.text('TOTAL OUTSTANDING', kpiX[2] + 2, yPos + 4);
-    doc.setFontSize(10);
-    doc.text('Rs ' + formatINR(totalOutstanding), kpiX[2] + 2, yPos + 10);
-
-    yPos += 20;
-
-    // Table title
-    doc.setFontSize(10);
-    doc.setFont('Helvetica', 'bold');
-    doc.text('OPEN CASES - ALL CLUSTERS', 15, yPos);
-    yPos += 6;
-
-    // Table header
-    doc.setFillColor(30, 60, 114);
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.setFont('Helvetica', 'bold');
-
-    const headers = ['#', 'DATE', 'CUSTOMER', 'CLUSTER', 'BRANCH', 'PRINCIPAL', 'CHARGES', 'GST', 'OUTSTANDING', 'DAYS', 'RATE', 'STATUS'];
-    const colWidths = [5, 12, 15, 12, 14, 15, 12, 10, 18, 7, 8, 12];
-
-    let xPos = 15;
-    headers.forEach((h, i) => {
-      doc.text(h, xPos + 1, yPos + 3, { maxWidth: colWidths[i] - 2, align: 'left' });
-      xPos += colWidths[i];
-    });
-
-    doc.setLineWidth(0.3);
-    doc.line(15, yPos + 4, 15 + colWidths.reduce((a, b) => a + b), yPos + 4);
-    yPos += 5;
-
-    // Table rows
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(7);
-
     const sortedLoans = openLoans.sort((a, b) => new Date(a.disbursement_date) - new Date(b.disbursement_date));
 
+    const logoBase64 = await fetchLogoBase64();
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.width;
+    const pageH = doc.internal.pageSize.height;
+    const margin = 14;
+    const contentW = W - margin * 2;
+    const today = format(new Date(), 'dd-MMM-yyyy');
+
+    // ── Page 1: Letterhead ────────────────────────────────────────
+    drawLetterhead(doc, logoBase64, W, margin);
+
+    // GSTIN value (just below gold divider)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...NAVY);
+    doc.text('29ABGFB6346P1ZR', W - margin, 48.5, { align: 'right' });
+
+    let y = 52;
+
+    // ── Report title band ──────────────────────────────────────────
+    doc.setFillColor(...NAVY);
+    doc.roundedRect(margin, y, contentW, 10, 1, 1, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('CONSOLIDATED MIS REPORT - ALL CLUSTERS', margin + 4, y + 7);
+    doc.setFontSize(8);
+    doc.text(`As of ${today}`, W - margin - 2, y + 7, { align: 'right' });
+    y += 14;
+
+    // ── KPI boxes ─────────────────────────────────────────────────
+    const totalPrincipal = openLoans.reduce((s, l) => s + (l.principal || 0), 0);
+    const totalOutstanding = openLoans.reduce((s, l) => s + calcOutstanding(l), 0);
+    const totalCharges = openLoans.reduce((s, l) => s + calcCharges(l), 0);
+
+    const kpis = [
+      { label: 'OPEN CASES', value: String(openLoans.length) },
+      { label: 'TOTAL PRINCIPAL', value: 'Rs ' + formatINR(totalPrincipal) },
+      { label: 'TOTAL CHARGES', value: 'Rs ' + formatINR(totalCharges) },
+      { label: 'TOTAL OUTSTANDING', value: 'Rs ' + formatINR(totalOutstanding) },
+    ];
+    const kpiW = contentW / kpis.length - 2;
+    kpis.forEach((kpi, i) => {
+      const kx = margin + i * (kpiW + 2.7);
+      doc.setFillColor(...NAVY);
+      doc.roundedRect(kx, y, kpiW, 14, 1, 1, 'F');
+      doc.setTextColor(...GOLD);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.text(kpi.label, kx + 3, y + 5);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text(kpi.value, kx + 3, y + 11);
+    });
+    y += 20;
+
+    // ── Open cases table ──────────────────────────────────────────
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...NAVY);
+    doc.text('OPEN CASES', margin, y);
+    y += 5;
+
+    // Table header
+    doc.setFillColor(...NAVY);
+    doc.rect(margin, y, contentW, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+
+    const headers = ['#', 'DATE', 'CUSTOMER', 'CLUSTER', 'BRANCH', 'PRINCIPAL', 'CHARGES', 'GST', 'OUTSTANDING', 'DAYS', 'RATE'];
+    const colWidths = [6, 17, 22, 17, 17, 18, 15, 12, 20, 9, 9];
+
+    let xPos = margin + 1;
+    headers.forEach((h, i) => {
+      const align = i >= 5 ? 'right' : 'left';
+      const tx = align === 'right' ? xPos + colWidths[i] - 2 : xPos;
+      doc.text(h, tx, y + 5, { align });
+      xPos += colWidths[i];
+    });
+    y += 8;
+
+    // Table rows
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+
     sortedLoans.forEach((l, idx) => {
-      if (yPos > pageHeight - 15) {
+      if (y > pageH - 20) {
         doc.addPage();
-        yPos = 15;
+        drawLetterhead(doc, logoBase64, W, margin);
+        y = 52;
       }
 
       const charges = calcCharges(l);
@@ -139,7 +224,7 @@ Deno.serve(async (req) => {
 
       const rowData = [
         String(idx + 1),
-        l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM-yyyy') : '-',
+        l.disbursement_date ? format(new Date(l.disbursement_date), 'dd-MMM-yy') : '-',
         l.borrower_name || '-',
         l.cluster || '-',
         l.branch || '-',
@@ -149,27 +234,82 @@ Deno.serve(async (req) => {
         'Rs ' + formatINR(outstanding),
         String(days),
         (l.rate || 0.5) + '%',
-        'Follow Up!'
       ];
 
-      xPos = 15;
+      // Alternate row bg
+      if (idx % 2 === 0) {
+        doc.setFillColor(245, 247, 252);
+        doc.rect(margin, y - 3, contentW, 5.5, 'F');
+      }
+
+      doc.setTextColor(30, 30, 50);
+      xPos = margin + 1;
       rowData.forEach((cell, i) => {
-        doc.text(cell, xPos + 1, yPos, { maxWidth: colWidths[i] - 2, align: i > 4 && i < 9 ? 'right' : 'left' });
+        const align = i >= 5 ? 'right' : 'left';
+        const tx = align === 'right' ? xPos + colWidths[i] - 2 : xPos;
+        doc.text(cell, tx, y, { maxWidth: colWidths[i] - 2, align });
         xPos += colWidths[i];
       });
 
-      yPos += 4.5;
+      // Bottom border
+      doc.setDrawColor(220, 225, 235);
+      doc.line(margin, y + 2, margin + contentW, y + 2);
+      y += 5.5;
     });
 
-    yPos += 3;
+    // Totals row
+    y += 2;
+    doc.setFillColor(...NAVY);
+    doc.rect(margin, y, contentW, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text('TOTAL', margin + 1, y + 5);
+    const totalCols = [totalPrincipal, totalCharges, totalOutstanding.valueOf() - totalPrincipal - totalCharges, totalOutstanding];
+    const totalColIdx = [5, 6, 7, 8];
+    let txBase = margin + 1;
+    colWidths.forEach((w, i) => {
+      if (totalColIdx.includes(i)) {
+        const val = i === 7 ? totalCharges * 0.18 : totalCols[totalColIdx.indexOf(i)];
+        doc.text('Rs ' + formatINR(val), txBase + w - 2, y + 5, { align: 'right' });
+      }
+      txBase += w;
+    });
+    y += 12;
 
-    // Cluster summary
+    // ── Cluster summary ───────────────────────────────────────────
+    if (y > pageH - 60) {
+      doc.addPage();
+      drawLetterhead(doc, logoBase64, W, margin);
+      y = 52;
+    }
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...NAVY);
+    doc.text('CLUSTER SUMMARY', margin, y);
+    y += 5;
+
+    doc.setFillColor(...NAVY);
+    const clHeaders = ['CLUSTER', 'CASES', 'PRINCIPAL', 'CHARGES', 'GST', 'OUTSTANDING'];
+    const clWidths = [38, 16, 30, 27, 22, 32];
+    const clContentW = clWidths.reduce((a, b) => a + b);
+    doc.rect(margin, y, clContentW, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    xPos = margin + 1;
+    clHeaders.forEach((h, i) => {
+      const align = i >= 2 ? 'right' : 'left';
+      doc.text(h, align === 'right' ? xPos + clWidths[i] - 2 : xPos, y + 5, { align });
+      xPos += clWidths[i];
+    });
+    y += 8;
+
     const clusterMap = {};
     openLoans.forEach(l => {
       const cluster = l.cluster || 'Unassigned';
-      if (!clusterMap[cluster]) {
-        clusterMap[cluster] = { cases: 0, principal: 0, charges: 0, gst: 0, outstanding: 0 };
-      }
+      if (!clusterMap[cluster]) clusterMap[cluster] = { cases: 0, principal: 0, charges: 0, gst: 0, outstanding: 0 };
       clusterMap[cluster].cases++;
       clusterMap[cluster].principal += l.principal || 0;
       const ch = calcCharges(l);
@@ -178,59 +318,40 @@ Deno.serve(async (req) => {
       clusterMap[cluster].outstanding += calcOutstanding(l);
     });
 
-    doc.setFontSize(10);
-    doc.setFont('Helvetica', 'bold');
-    doc.text('CLUSTER SUMMARY', 15, yPos);
-    yPos += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(30, 30, 50);
 
-    // Cluster table header
-    doc.setFillColor(30, 60, 114);
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
-    const clusterHeaders = ['CLUSTER', 'CASES', 'PRINCIPAL', 'CHARGES', 'GST', 'OUTSTANDING'];
-    const clusterColWidths = [35, 15, 28, 25, 20, 32];
-
-    xPos = 15;
-    clusterHeaders.forEach((h, i) => {
-      doc.text(h, xPos + 1, yPos + 2, { maxWidth: clusterColWidths[i] - 2, align: 'left' });
-      xPos += clusterColWidths[i];
+    Object.entries(clusterMap).sort(([a], [b]) => a.localeCompare(b)).forEach(([cluster, data], idx) => {
+      if (idx % 2 === 0) {
+        doc.setFillColor(245, 247, 252);
+        doc.rect(margin, y - 3, clContentW, 6, 'F');
+      }
+      const rowData = [
+        cluster,
+        String(data.cases),
+        'Rs ' + formatINR(data.principal),
+        'Rs ' + formatINR(data.charges),
+        'Rs ' + formatINR(data.gst),
+        'Rs ' + formatINR(data.outstanding),
+      ];
+      xPos = margin + 1;
+      rowData.forEach((cell, i) => {
+        const align = i >= 2 ? 'right' : 'left';
+        doc.text(cell, align === 'right' ? xPos + clWidths[i] - 2 : xPos, y, { align });
+        xPos += clWidths[i];
+      });
+      doc.setDrawColor(220, 225, 235);
+      doc.line(margin, y + 2, margin + clContentW, y + 2);
+      y += 6;
     });
 
-    doc.setLineWidth(0.3);
-    doc.line(15, yPos + 4, 15 + clusterColWidths.reduce((a, b) => a + b), yPos + 4);
-    yPos += 5;
-
-    // Cluster rows
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8);
-
-    Object.entries(clusterMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .forEach(([cluster, data]) => {
-        const rowData = [
-          cluster,
-          String(data.cases),
-          'Rs ' + formatINR(data.principal),
-          'Rs ' + formatINR(data.charges),
-          'Rs ' + formatINR(data.gst),
-          'Rs ' + formatINR(data.outstanding)
-        ];
-
-        xPos = 15;
-        rowData.forEach((cell, i) => {
-          doc.text(cell, xPos + 1, yPos, { maxWidth: clusterColWidths[i] - 2, align: i > 1 ? 'right' : 'left' });
-          xPos += clusterColWidths[i];
-        });
-
-        yPos += 4;
-      });
-
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text('BridgeLine Partners', 15, pageHeight - 10);
-    doc.text('Generated: ' + format(new Date(), 'dd-MMM-yyyy'), pageWidth - 50, pageHeight - 10);
+    // Generated timestamp
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 160);
+    doc.text(`Generated: ${today}  |  Confidential`, W / 2, y, { align: 'center' });
 
     const pdfBytes = doc.output('arraybuffer');
     return new Response(pdfBytes, {
@@ -238,7 +359,7 @@ Deno.serve(async (req) => {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename=BridgeLine-MIS-${format(new Date(), 'yyyyMMdd')}.pdf`,
-        'Content-Length': pdfBytes.byteLength.toString()
+        'Content-Length': pdfBytes.byteLength.toString(),
       }
     });
   } catch (error) {

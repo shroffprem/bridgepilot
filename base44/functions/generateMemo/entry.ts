@@ -52,6 +52,97 @@ async function fetchLogoBase64() {
   }
 }
 
+// ── BridgeLine Partners Letterhead constants ──────────────────
+// Navy: #1A2744 | Gold: #C9A84C
+const NAVY = [26, 39, 68];
+const GOLD = [201, 168, 76];
+
+function drawLetterhead(doc, logoBase64, W, margin) {
+  const pageH = 297;
+  const contentW = W - margin * 2;
+
+  // ── Header: full-width navy block ────────────────────────────
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, W, 42, 'F');
+
+  // Left: Logo + wordmark
+  if (logoBase64) {
+    doc.addImage(logoBase64, 'PNG', margin, 5, 26, 26);
+  }
+  // "BridgeLine" bold white, "Partners" regular white
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  const logoRight = logoBase64 ? margin + 29 : margin;
+  doc.text('BridgeLine', logoRight, 25);
+  const blWidth = doc.getTextWidth('BridgeLine');
+  doc.setFont('helvetica', 'normal');
+  doc.text('Partners', logoRight + blWidth + 1, 25);
+
+  // Right: ADDRESS / CONTACT / GSTIN labels in gold, values in white
+  const rx = W - margin;
+  // ADDRESS label
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GOLD);
+  doc.setCharSpace(1.5);
+  doc.text('A D D R E S S', rx, 9, { align: 'right' });
+  doc.setCharSpace(0);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+  doc.text('2nd Floor, 3282/1, Apt No 5, Ashraya Residency,', rx, 14, { align: 'right' });
+  doc.text('Vijaynagar 3rd Stage, E Block, Garudachar Layout,', rx, 18.5, { align: 'right' });
+  doc.text('Mysuru, Karnataka \u2013 570030', rx, 23, { align: 'right' });
+
+  // CONTACT label
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GOLD);
+  doc.setCharSpace(1.5);
+  doc.text('C O N T A C T', rx, 28.5, { align: 'right' });
+  doc.setCharSpace(0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+  doc.text('+91 96862 88166  \u00B7  +91 98451 22023', rx, 33.5, { align: 'right' });
+
+  // GSTIN label
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GOLD);
+  doc.setCharSpace(1.5);
+  doc.text('G S T I N', rx - 0, 38.5, { align: 'right' });
+  doc.setCharSpace(0);
+  // GSTIN value goes below header — will be at y=44 area, handled outside
+
+  // ── Gold divider below header ─────────────────────────────────
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.6);
+  doc.line(margin, 43.5, W - margin, 43.5);
+  doc.setLineWidth(0.2);
+
+  // ── Footer ────────────────────────────────────────────────────
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(0.6);
+  doc.line(margin, pageH - 14, W - margin, pageH - 14);
+  doc.setLineWidth(0.2);
+
+  // Footer wordmark: "BridgeLine" in navy bold, "Partners" in gold
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...NAVY);
+  const footerX = W / 2;
+  const bText = 'BridgeLine';
+  const bW = doc.getTextWidth(bText);
+  const pText = 'Partners';
+  const pW = doc.getTextWidth(pText);
+  const totalFW = bW + pW + 0.5;
+  doc.text(bText, footerX - totalFW / 2, pageH - 8);
+  doc.setTextColor(...GOLD);
+  doc.text(pText, footerX - totalFW / 2 + bW + 0.5, pageH - 8);
+}
+
 function buildPDF(loan, collection, logoBase64) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = 210, pageH = 297;
@@ -66,52 +157,18 @@ function buildPDF(loan, collection, logoBase64) {
   const outstanding = isClosed ? 0 : calcOutstanding(loan);
   const days = calcDays(loan);
 
-  // ── Navy header bar ──────────────────────────────────────────
-  doc.setFillColor(31, 40, 70);
-  doc.rect(0, 0, W, 38, 'F');
+  // Draw letterhead (header + gold divider + footer)
+  drawLetterhead(doc, logoBase64, W, margin);
 
-  // Logo or company name fallback
-  if (logoBase64) {
-    doc.addImage(logoBase64, 'PNG', margin, 5, 28, 28);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.text('BridgeLine Partners', margin + 31, 16);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text(isClosed ? 'COLLECTION MEMO' : 'DISBURSEMENT MEMO', margin + 31, 23);
-  } else {
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('BridgeLine Partners', margin, 14);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text(isClosed ? 'COLLECTION MEMO' : 'DISBURSEMENT MEMO', margin, 22);
-  }
-
+  // GSTIN value just below gold divider (since label is clipped in header)
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.setTextColor(200, 210, 255);
-  doc.text(`REPORTING DATE  ${today}`, margin, 29);
-
-  // Right side: address block
-  doc.setFontSize(7);
-  doc.setTextColor(200, 210, 255);
-  const addr = [
-    '2nd Floor, 3282/1, Apt 5, Ashraya Residency',
-    'Vijaynagar 3rd Stage E Block, Mysuru 570030',
-    '+91 99862 88166 | +91 98451 22023',
-    'GSTIN: 29ABGFB6346P1ZR',
-  ];
-  let ay = 10;
-  addr.forEach(line => {
-    doc.text(line, W - margin, ay, { align: 'right' });
-    ay += 6;
-  });
+  doc.setTextColor(...NAVY);
+  doc.text('29ABGFB6346P1ZR', W - margin, 48.5, { align: 'right' });
 
   // ── Title band ───────────────────────────────────────────────
-  let y = 44;
-  doc.setFillColor(31, 40, 70);
+  let y = 52;
+  doc.setFillColor(...NAVY);
   doc.roundedRect(margin, y, contentW, 10, 1, 1, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
@@ -123,16 +180,16 @@ function buildPDF(loan, collection, logoBase64) {
 
   // ── Status ribbon ─────────────────────────────────────────────
   y += 13;
-  doc.setFillColor(31, 40, 70);
+  doc.setFillColor(...NAVY);
   doc.rect(margin, y, contentW, 8, 'F');
-  doc.setTextColor(255, 193, 7);
+  doc.setTextColor(...GOLD);
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   const ribbonItems = [
     `Date: ${fmtDate(loan.disbursement_date)}`,
-    `Status: ${isClosed ? 'Closed ✓' : 'Follow Up!'}`,
-    `Days Outstanding: ${days}`,
-    `Charge Rate: ${loan.rate || 0}%`,
+    `Status: ${isClosed ? 'Closed' : 'Active'}`,
+    `Days Open: ${days}`,
+    `Rate: ${loan.rate || 0}%`,
   ];
   const ribbonW = contentW / ribbonItems.length;
   ribbonItems.forEach((item, i) => {
@@ -143,7 +200,7 @@ function buildPDF(loan, collection, logoBase64) {
   y += 12;
   doc.setFillColor(232, 236, 245);
   doc.rect(margin, y, contentW, 6, 'F');
-  doc.setTextColor(31, 40, 70);
+  doc.setTextColor(...NAVY);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text('Disbursed to', margin + 2, y + 4.5);
@@ -158,8 +215,8 @@ function buildPDF(loan, collection, logoBase64) {
 
   const leftFields = [
     ['Customer:', loan.borrower_name || '-'],
-    ['Company:', 'Hdb'],
     ['Cluster:', loan.cluster || '-'],
+    ['SO Name:', loan.so_name || '-'],
   ];
   const rightFields = [
     ['Branch:', loan.branch || '-'],
@@ -193,8 +250,8 @@ function buildPDF(loan, collection, logoBase64) {
   y += leftFields.length * 7 + 8;
   const halfW = contentW / 2 - 2;
 
-  // Left header: DESCRIPTION
-  doc.setFillColor(31, 40, 70);
+  // Left header
+  doc.setFillColor(...NAVY);
   doc.rect(margin, y, halfW, 7, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
@@ -202,11 +259,11 @@ function buildPDF(loan, collection, logoBase64) {
   doc.text('Description', margin + 2, y + 5);
   doc.text('Amount', margin + halfW - 2, y + 5, { align: 'right' });
 
-  // Right header: COLLECTION DETAILS
+  // Right header
   const cx = margin + halfW + 4;
-  doc.setFillColor(31, 40, 70);
+  doc.setFillColor(...NAVY);
   doc.rect(cx, y, halfW, 7, 'F');
-  doc.text('Collection details', cx + 2, y + 5);
+  doc.text('Collection Details', cx + 2, y + 5);
 
   y += 9;
   doc.setFont('helvetica', 'normal');
@@ -214,57 +271,44 @@ function buildPDF(loan, collection, logoBase64) {
   doc.setTextColor(50, 50, 60);
 
   const descRows = [
-   ['Amount disbursed', fmtINR(loan.principal), false],
-   ['Service charges', fmtINR(charges), false],
-   ['GST (18%)', fmtINR(gst), false],
-   ['Total payable', fmtINR(totalPayable), true],
+    ['Amount disbursed', fmtINR(loan.principal), false],
+    ['Service charges', fmtINR(charges), false],
+    ['GST (18%)', fmtINR(gst), false],
+    ['Total payable', fmtINR(totalPayable), true],
   ];
 
   const collRows = [
-   ['Collected date', isClosed ? fmtDate(collection?.credit_note_date || loan.closure_date) : '-', false],
-   ['Collected amount', isClosed ? fmtINR(collection?.amount_collected || totalPayable) : '-', false],
-   ['Balance O/S', fmtINR(outstanding), true],
-   ['Days outstanding', String(days), false],
+    ['Collected date', isClosed ? fmtDate(collection?.credit_note_date || loan.closure_date) : '-', false],
+    ['Collected amount', isClosed ? fmtINR(collection?.amount_collected || totalPayable) : '-', false],
+    ['Balance O/S', fmtINR(outstanding), true],
+    ['Days outstanding', String(days), false],
   ];
 
   const rowH = 7;
   const tableH = descRows.length * rowH;
 
-  // Draw borders
   doc.setDrawColor(210, 215, 230);
   doc.rect(margin, y - 2, halfW, tableH + 2, 'S');
   doc.rect(cx, y - 2, halfW, tableH + 2, 'S');
 
   descRows.forEach(([label, val, bold], i) => {
     const ry = y + i * rowH;
-    if (i % 2 === 0) {
-      doc.setFillColor(248, 249, 252);
-      doc.rect(margin, ry - 2, halfW, rowH, 'F');
-    }
-    if (bold) {
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(31, 40, 70);
-    } else {
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 70);
-    }
-    doc.text(label, margin + 2, ry + 3.5);
     if (bold) {
       doc.setFillColor(240, 244, 255);
       doc.rect(margin, ry - 2, halfW, rowH, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(31, 40, 70);
-      doc.text(label, margin + 2, ry + 3.5);
+      doc.setTextColor(...NAVY);
+    } else {
+      if (i % 2 === 0) { doc.setFillColor(248, 249, 252); doc.rect(margin, ry - 2, halfW, rowH, 'F'); }
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 70);
     }
+    doc.text(label, margin + 2, ry + 3.5);
     doc.text(val, margin + halfW - 2, ry + 3.5, { align: 'right' });
   });
 
   collRows.forEach(([label, val, bold], i) => {
     const ry = y + i * rowH;
-    if (i % 2 === 0) {
-      doc.setFillColor(248, 249, 252);
-      doc.rect(cx, ry - 2, halfW, rowH, 'F');
-    }
     if (bold && outstanding > 0) {
       doc.setFillColor(255, 240, 240);
       doc.rect(cx, ry - 2, halfW, rowH, 'F');
@@ -276,12 +320,12 @@ function buildPDF(loan, collection, logoBase64) {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(20, 120, 50);
     } else {
+      if (i % 2 === 0) { doc.setFillColor(248, 249, 252); doc.rect(cx, ry - 2, halfW, rowH, 'F'); }
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(60, 60, 70);
     }
     doc.text(label, cx + 2, ry + 3.5);
     doc.text(String(val), cx + halfW - 2, ry + 3.5, { align: 'right' });
-    // reset
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 70);
   });
@@ -289,7 +333,7 @@ function buildPDF(loan, collection, logoBase64) {
   // ── TAT Policy box ────────────────────────────────────────────
   y += tableH + 10;
   doc.setFillColor(255, 252, 230);
-  doc.setDrawColor(220, 200, 100);
+  doc.setDrawColor(...GOLD);
   doc.rect(margin, y, contentW, 16, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
@@ -299,12 +343,11 @@ function buildPDF(loan, collection, logoBase64) {
   doc.setFontSize(7);
   doc.setTextColor(80, 60, 10);
   doc.text('<=2d: 0.50% | 3d: 1.00% | 4d: 1.50% | 5d+: 0.50% x days | GST 18% on all charges', margin + 3, y + 11);
-  doc.text('Charges fixed at disbursement. Refunds must be from same disbursing account (BLP/CIR/002/2026-27).', margin + 3, y + 15.5);
+  doc.text('Charges fixed at disbursement. Refunds must be from same account (BLP/CIR/002/2026-27).', margin + 3, y + 15.5);
 
   // ── Signature section ─────────────────────────────────────────
   y += 26;
   doc.setDrawColor(180, 180, 200);
-  // Two signature boxes
   const sigW = contentW / 2 - 6;
   doc.setFillColor(250, 250, 252);
   doc.rect(margin, y, sigW, 22, 'FD');
@@ -316,7 +359,7 @@ function buildPDF(loan, collection, logoBase64) {
   doc.text('Authorised by', margin + 3, y + 6);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.setTextColor(31, 40, 70);
+  doc.setTextColor(...NAVY);
   doc.text('Prem / Harsha', margin + 3, y + 16);
 
   doc.setFont('helvetica', 'normal');
@@ -325,18 +368,14 @@ function buildPDF(loan, collection, logoBase64) {
   doc.text('Received by', margin + sigW + 15, y + 6);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.setTextColor(31, 40, 70);
+  doc.setTextColor(...NAVY);
   doc.text(loan.borrower_name || 'Customer', margin + sigW + 15, y + 16);
 
-  // ── Footer ────────────────────────────────────────────────────
-  doc.setFillColor(31, 40, 70);
-  doc.rect(0, pageH - 12, W, 12, 'F');
-  doc.setTextColor(180, 190, 220);
+  // Generated date at bottom
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.text('BridgeLine Partners', margin, pageH - 5);
-  doc.text('Page 1 of 1', W / 2, pageH - 5, { align: 'center' });
-  doc.text(`Confidential | Generated: ${today}`, W - margin, pageH - 5, { align: 'right' });
+  doc.setTextColor(150, 150, 160);
+  doc.text(`Generated: ${today}  |  Confidential`, W / 2, pageH - 17, { align: 'center' });
 
   return doc.output('arraybuffer');
 }

@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import { IndianRupee, TrendingUp, Users, AlertTriangle, CreditCard, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ExportPanel from '@/components/reports/ExportPanel';
 
 function formatINR(n) {
   if (!n) return '₹0';
@@ -250,6 +251,7 @@ export default function Reports() {
           {[
             { key: 'mis', label: 'Consolidated MIS' },
             { key: 'dashboard', label: 'Dashboard Reports' },
+            { key: 'export', label: 'Export Data' },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -284,6 +286,9 @@ export default function Reports() {
             </Button>
           </div>
         )}
+
+        {/* Export Data tab */}
+        {activeTab === 'export' && <ExportPanel />}
 
         {/* Dashboard Reports tab */}
         {activeTab === 'dashboard' && (

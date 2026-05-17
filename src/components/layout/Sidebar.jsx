@@ -88,7 +88,7 @@ export default function Sidebar() {
       <div className="px-3 pb-4 border-t border-sidebar-border pt-3 space-y-1">
         {visibleAdmin.map(item => <NavLink key={item.path} {...item} />)}
         <button
-          onClick={() => base44.auth.logout()}
+          onClick={() => base44.auth.logout('/login')}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-white transition-colors text-sm font-medium"
         >
           <LogOut size={17} />

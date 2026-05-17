@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, startOfMonth, startOfYear, parseISO, isWithinInterval } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { IndianRupee, TrendingUp, Users, AlertTriangle, CreditCard, Download } from 'lucide-react';
+import { IndianRupee, TrendingUp, Users, AlertTriangle, CreditCard, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ExportPanel from '@/components/reports/ExportPanel';
+import * as XLSX from 'xlsx';
 
 function formatINR(n) {
   if (!n) return '₹0';
@@ -117,6 +118,185 @@ export default function Reports() {
       }
     } catch (err) {
       console.error('Download failed:', err);
+    }
+    setDownloading(null);
+  };
+
+  const downloadCollectionReport = async (period, fileType) => {
+    const key = `collection_${period}_${fileType}`;
+    setDownloading(key);
+    try {
+      const now = new Date();
+      const from = period === 'mtd' ? startOfMonth(now) : startOfYear(now);
+      const filtered = collections.filter(c => {
+        if (!c.credit_note_date) return false;
+        return isWithinInterval(parseISO(c.credit_note_date), { start: from, end: now });
+      });
+
+      const rows = filtered.map(c => ({
+        'Loan #':               c.loan_number || '',
+        'Borrower':             c.borrower_name || '',
+        'Branch':               c.branch || '',
+        'Cluster':              c.cluster || '',
+        'Date':                 c.credit_note_date || '',
+        'Amount Collected (₹)': c.amount_collected || 0,
+        'Principal (₹)':        c.principal_component || 0,
+        'Charges (₹)':          c.charges_component || 0,
+        'GST (₹)':              c.gst_component || 0,
+        'Penalty (₹)':          c.penalty_component || 0,
+        'Bank':                 c.bank_name || '',
+        'Payment Mode':         (c.payment_mode || '').replace(/_/g, ' '),
+        'UTR / Ref':            c.credit_note_number || '',
+        'Closure Date':         c.closure_date || '',
+        'Loan Closed':          c.close_loan ? 'Yes' : 'No',
+        'Notes':                c.notes || '',
+      }));
+
+      if (fileType === 'excel') {
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Collections');
+        XLSX.writeFile(wb, `BridgeLine-Collections-${period.toUpperCase()}-${format(now, 'yyyyMMdd')}.xlsx`);
+      } else {
+        const { jsPDF } = await import('jspdf');
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const W = doc.internal.pageSize.width;
+        const pageH = doc.internal.pageSize.height;
+        const M = 12;
+        const contentW = W - M * 2;
+        const NAVY = [26, 39, 68];
+        const GOLD = [201, 168, 76];
+        const label = period === 'mtd' ? format(now, 'MMMM yyyy') : `YTD ${now.getFullYear()}`;
+        const today = format(now, 'dd-MMM-yyyy');
+
+        function drawHeader() {
+          doc.setFillColor(...NAVY);
+          doc.rect(0, 0, W, 18, 'F');
+          doc.setDrawColor(...GOLD);
+          doc.setLineWidth(0.8);
+          doc.line(M, 18.5, W - M, 18.5);
+          doc.setLineWidth(0.2);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.setTextColor(255, 255, 255);
+          doc.text('BridgeLine', M, 11);
+          const bW = doc.getTextWidth('BridgeLine');
+          doc.setTextColor(...GOLD);
+          doc.text('Partners', M + bW + 1, 11);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.setTextColor(255, 255, 255);
+          doc.text(`COLLECTIONS REPORT — ${label.toUpperCase()}`, W / 2, 11, { align: 'center' });
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6.5);
+          doc.setTextColor(200, 200, 210);
+          doc.text(`Generated: ${today}`, W - M, 11, { align: 'right' });
+        }
+
+        const DEFS = [
+          { key: 'Loan #',               w: 22 },
+          { key: 'Borrower',             w: 36 },
+          { key: 'Branch',               w: 22 },
+          { key: 'Cluster',              w: 20 },
+          { key: 'Date',                 w: 18 },
+          { key: 'Amount Collected (₹)', w: 24, right: true },
+          { key: 'Principal (₹)',        w: 18, right: true },
+          { key: 'Charges (₹)',          w: 16, right: true },
+          { key: 'GST (₹)',              w: 13, right: true },
+          { key: 'Penalty (₹)',          w: 14, right: true },
+          { key: 'Payment Mode',         w: 20 },
+          { key: 'UTR / Ref',            w: 38 },
+          { key: 'Loan Closed',          w: 14 },
+        ];
+        const totalW = DEFS.reduce((s, d) => s + d.w, 0);
+        const scale = contentW / totalW;
+        const sDefs = DEFS.map(d => ({ ...d, w: d.w * scale }));
+
+        drawHeader();
+
+        // Title
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(...NAVY);
+        doc.text(`Collections Register — ${label}`, M, 27);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(100, 110, 130);
+        doc.text(`${rows.length} records`, M + doc.getTextWidth(`Collections Register — ${label}`) + 4, 27);
+
+        let y = 31;
+        const ROW_H = 6, HEAD_H = 7;
+
+        function tableHeader(yy) {
+          doc.setFillColor(...NAVY);
+          doc.rect(M, yy, contentW, HEAD_H, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6);
+          let x = M;
+          sDefs.forEach(d => {
+            doc.text(d.key, d.right ? x + d.w - 1.5 : x + 1.5, yy + 4.8, { align: d.right ? 'right' : 'left', maxWidth: d.w - 2 });
+            x += d.w;
+          });
+          return yy + HEAD_H + 1;
+        }
+
+        y = tableHeader(y);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+
+        rows.forEach((row, ri) => {
+          if (y + ROW_H > pageH - 12) {
+            doc.addPage();
+            drawHeader();
+            y = tableHeader(22);
+          }
+          if (ri % 2 === 0) {
+            doc.setFillColor(244, 246, 252);
+            doc.rect(M, y - 1, contentW, ROW_H, 'F');
+          }
+          doc.setTextColor(25, 30, 55);
+          let x = M;
+          sDefs.forEach(d => {
+            const val = row[d.key] != null ? String(row[d.key]) : '';
+            const maxChars = Math.floor(d.w / 1.6);
+            const display = val.length > maxChars ? val.slice(0, maxChars - 1) + '…' : val;
+            doc.text(display, d.right ? x + d.w - 1.5 : x + 1.5, y + 3.8, { align: d.right ? 'right' : 'left' });
+            x += d.w;
+          });
+          doc.setDrawColor(215, 220, 235);
+          doc.setLineWidth(0.15);
+          doc.line(M, y + ROW_H - 0.5, M + contentW, y + ROW_H - 0.5);
+          y += ROW_H;
+        });
+
+        // Summary bar
+        const totalAmt = rows.reduce((s, r) => s + (r['Amount Collected (₹)'] || 0), 0);
+        const totalPenalty = rows.reduce((s, r) => s + (r['Penalty (₹)'] || 0), 0);
+        doc.setFillColor(235, 238, 248);
+        doc.rect(M, y + 2, contentW, 8, 'F');
+        doc.setDrawColor(...NAVY);
+        doc.setLineWidth(0.3);
+        doc.rect(M, y + 2, contentW, 8, 'S');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(...NAVY);
+        const penStr = totalPenalty > 0 ? `   |   Penalty: ₹${Math.round(totalPenalty).toLocaleString('en-IN')}` : '';
+        doc.text(`Total: ${rows.length} records   |   Amount Collected: ₹${Math.round(totalAmt).toLocaleString('en-IN')}${penStr}`, M + 3, y + 7.5);
+
+        // Page numbers
+        const totalPages = doc.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+          doc.setPage(i);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(150, 155, 170);
+          doc.text(`Page ${i} of ${totalPages}  |  Confidential — BridgeLine Partners`, W / 2, pageH - 5, { align: 'center' });
+        }
+
+        doc.save(`BridgeLine-Collections-${period.toUpperCase()}-${format(now, 'yyyyMMdd')}.pdf`);
+      }
+    } catch (err) {
+      console.error('Collection report failed:', err);
     }
     setDownloading(null);
   };
@@ -336,6 +516,53 @@ export default function Reports() {
                   {downloading === 'dashboard_ytd' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                   {downloading === 'dashboard_ytd' ? 'Generating...' : 'Download YTD'}
                 </Button>
+              </div>
+            </div>
+
+            {/* Collection Report section */}
+            <div className="mt-6">
+              <h4 className="font-syne font-bold text-sm mb-1">Collection Report</h4>
+              <p className="text-xs text-muted-foreground mb-3">Detailed breakdown of all collections — principal, charges, GST, penalty, UTR</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Collection MTD */}
+                <div className="border border-border rounded-xl p-4">
+                  <div className="mb-3">
+                    <div className="font-semibold text-sm">MTD Collections</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{format(new Date(), 'MMMM yyyy')}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="gap-1.5 flex-1"
+                      onClick={() => downloadCollectionReport('mtd', 'excel')} disabled={!!downloading}>
+                      {downloading === 'collection_mtd_excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} className="text-green-600" />}
+                      {downloading === 'collection_mtd_excel' ? 'Generating...' : 'Excel'}
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5 flex-1"
+                      onClick={() => downloadCollectionReport('mtd', 'pdf')} disabled={!!downloading}>
+                      {downloading === 'collection_mtd_pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} className="text-red-500" />}
+                      {downloading === 'collection_mtd_pdf' ? 'Generating...' : 'PDF'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Collection YTD */}
+                <div className="border border-border rounded-xl p-4">
+                  <div className="mb-3">
+                    <div className="font-semibold text-sm">YTD Collections</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Jan – {format(new Date(), 'MMM yyyy')}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="gap-1.5 flex-1"
+                      onClick={() => downloadCollectionReport('ytd', 'excel')} disabled={!!downloading}>
+                      {downloading === 'collection_ytd_excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} className="text-green-600" />}
+                      {downloading === 'collection_ytd_excel' ? 'Generating...' : 'Excel'}
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5 flex-1"
+                      onClick={() => downloadCollectionReport('ytd', 'pdf')} disabled={!!downloading}>
+                      {downloading === 'collection_ytd_pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} className="text-red-500" />}
+                      {downloading === 'collection_ytd_pdf' ? 'Generating...' : 'PDF'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

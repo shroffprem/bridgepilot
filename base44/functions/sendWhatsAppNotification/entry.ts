@@ -10,6 +10,7 @@ async function sendWhatsApp(to, message) {
   }
 
   const toNumber = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
+  console.log("FROM:", FROM_NUMBER, "TO:", toNumber);
 
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID}/Messages.json`,

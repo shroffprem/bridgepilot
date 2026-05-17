@@ -72,11 +72,11 @@ export default function Register() {
 
   if (showOtp) {
     return (
-      <AuthLayout
-        icon={Mail}
-        title="Verify your email"
-        subtitle={`We sent a code to ${email}`}
-      >
+      <AuthLayout>
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-foreground">Verify your email</h2>
+          <p className="text-muted-foreground text-sm mt-1">We sent a code to {email}</p>
+        </div>
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
             {error}
@@ -126,9 +126,6 @@ export default function Register() {
 
   return (
     <AuthLayout
-      icon={UserPlus}
-      title="Create your account"
-      subtitle="Sign up to get started"
       footer={
         <>
           Already have an account?{" "}
@@ -138,9 +135,14 @@ export default function Register() {
         </>
       }
     >
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-foreground">Create your account</h2>
+        <p className="text-muted-foreground text-sm mt-1">Sign up to get started</p>
+      </div>
+
       <Button
         variant="outline"
-        className="w-full h-12 text-sm font-medium mb-6"
+        className="w-full h-11 text-sm font-medium mb-5"
         onClick={handleGoogle}
       >
         <GoogleIcon className="w-5 h-5 mr-2" />

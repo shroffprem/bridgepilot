@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { format, differenceInDays, startOfMonth, startOfYear, parseISO, isWithinInterval,
-  subMonths, endOfMonth, startOfQuarter, endOfQuarter, startOfDay, endOfDay } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { IndianRupee, TrendingUp, Users, AlertTriangle, CreditCard, Download, FileSpreadsheet, FileText, CalendarRange } from 'lucide-react';
+import { IndianRupee, TrendingUp, Users, AlertTriangle, CreditCard, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import ExportPanel from '@/components/reports/ExportPanel';
-import * as XLSX from 'xlsx';
+import DashboardReportsTab from '@/components/reports/DashboardReportsTab';
 
 function formatINR(n) {
   if (!n) return '₹0';
@@ -68,24 +66,6 @@ export default function Reports() {
   const [downloading, setDownloading] = useState(null);
   const [activeTab, setActiveTab] = useState('mis');
 
-  const now = new Date();
-  const PRESETS = [
-    { label: 'Today',        from: startOfDay(now),                        to: endOfDay(now) },
-    { label: 'This Month',   from: startOfMonth(now),                      to: now },
-    { label: 'Last Month',   from: startOfMonth(subMonths(now, 1)),        to: endOfMonth(subMonths(now, 1)) },
-    { label: 'This Quarter', from: startOfQuarter(now),                    to: now },
-    { label: 'This Year',    from: startOfYear(now),                       to: now },
-  ];
-  const [collPreset, setCollPreset] = useState('This Month');
-  const [collFrom, setCollFrom]     = useState(format(startOfMonth(now), 'yyyy-MM-dd'));
-  const [collTo, setCollTo]         = useState(format(now, 'yyyy-MM-dd'));
-
-  const handlePreset = (preset) => {
-    setCollPreset(preset.label);
-    setCollFrom(format(preset.from, 'yyyy-MM-dd'));
-    setCollTo(format(preset.to, 'yyyy-MM-dd'));
-  };
-
   useEffect(() => {
     Promise.all([
       base44.entities.Loan.list(),
@@ -138,188 +118,6 @@ export default function Reports() {
       }
     } catch (err) {
       console.error('Download failed:', err);
-    }
-    setDownloading(null);
-  };
-
-  const downloadCollectionReport = async (fileType) => {
-    const key = `collection_${fileType}`;
-    setDownloading(key);
-    try {
-      const from = parseISO(collFrom);
-      const to   = parseISO(collTo);
-      const label = collPreset === 'Custom'
-        ? `${collFrom} to ${collTo}`
-        : collPreset;
-      const filtered = collections.filter(c => {
-        if (!c.credit_note_date) return false;
-        const d = parseISO(c.credit_note_date);
-        return d >= from && d <= to;
-      });
-
-      const rows = filtered.map(c => ({
-        'Loan #':               c.loan_number || '',
-        'Borrower':             c.borrower_name || '',
-        'Branch':               c.branch || '',
-        'Cluster':              c.cluster || '',
-        'Date':                 c.credit_note_date || '',
-        'Amount Collected (₹)': c.amount_collected || 0,
-        'Principal (₹)':        c.principal_component || 0,
-        'Charges (₹)':          c.charges_component || 0,
-        'GST (₹)':              c.gst_component || 0,
-        'Penalty (₹)':          c.penalty_component || 0,
-        'Bank':                 c.bank_name || '',
-        'Payment Mode':         (c.payment_mode || '').replace(/_/g, ' '),
-        'UTR / Ref':            c.credit_note_number || '',
-        'Closure Date':         c.closure_date || '',
-        'Loan Closed':          c.close_loan ? 'Yes' : 'No',
-        'Notes':                c.notes || '',
-      }));
-
-      if (fileType === 'excel') {
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Collections');
-        XLSX.writeFile(wb, `BridgeLine-Collections-${label.replace(/\s/g,'-')}-${format(now, 'yyyyMMdd')}.xlsx`);
-      } else {
-        const { jsPDF } = await import('jspdf');
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const W = doc.internal.pageSize.width;
-        const pageH = doc.internal.pageSize.height;
-        const M = 12;
-        const contentW = W - M * 2;
-        const NAVY = [26, 39, 68];
-        const GOLD = [201, 168, 76];
-        const today = format(now, 'dd-MMM-yyyy');
-
-        function drawHeader() {
-          doc.setFillColor(...NAVY);
-          doc.rect(0, 0, W, 18, 'F');
-          doc.setDrawColor(...GOLD);
-          doc.setLineWidth(0.8);
-          doc.line(M, 18.5, W - M, 18.5);
-          doc.setLineWidth(0.2);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(11);
-          doc.setTextColor(255, 255, 255);
-          doc.text('BridgeLine', M, 11);
-          const bW = doc.getTextWidth('BridgeLine');
-          doc.setTextColor(...GOLD);
-          doc.text('Partners', M + bW + 1, 11);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
-          doc.setTextColor(255, 255, 255);
-          doc.text(`COLLECTIONS REPORT — ${label.toUpperCase()}`, W / 2, 11, { align: 'center' });
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6.5);
-          doc.setTextColor(200, 200, 210);
-          doc.text(`Generated: ${today}`, W - M, 11, { align: 'right' });
-        }
-
-        const DEFS = [
-          { key: 'Loan #',               w: 22 },
-          { key: 'Borrower',             w: 36 },
-          { key: 'Branch',               w: 22 },
-          { key: 'Cluster',              w: 20 },
-          { key: 'Date',                 w: 18 },
-          { key: 'Amount Collected (₹)', w: 24, right: true },
-          { key: 'Principal (₹)',        w: 18, right: true },
-          { key: 'Charges (₹)',          w: 16, right: true },
-          { key: 'GST (₹)',              w: 13, right: true },
-          { key: 'Penalty (₹)',          w: 14, right: true },
-          { key: 'Payment Mode',         w: 20 },
-          { key: 'UTR / Ref',            w: 38 },
-          { key: 'Loan Closed',          w: 14 },
-        ];
-        const totalW = DEFS.reduce((s, d) => s + d.w, 0);
-        const scale = contentW / totalW;
-        const sDefs = DEFS.map(d => ({ ...d, w: d.w * scale }));
-
-        drawHeader();
-
-        // Title
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
-        doc.setTextColor(...NAVY);
-        doc.text(`Collections Register — ${label}`, M, 27);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6.5);
-        doc.setTextColor(100, 110, 130);
-        doc.text(`${rows.length} records`, M + doc.getTextWidth(`Collections Register — ${label}`) + 4, 27);
-
-        let y = 31;
-        const ROW_H = 6, HEAD_H = 7;
-
-        function tableHeader(yy) {
-          doc.setFillColor(...NAVY);
-          doc.rect(M, yy, contentW, HEAD_H, 'F');
-          doc.setTextColor(255, 255, 255);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(6);
-          let x = M;
-          sDefs.forEach(d => {
-            doc.text(d.key, d.right ? x + d.w - 1.5 : x + 1.5, yy + 4.8, { align: d.right ? 'right' : 'left', maxWidth: d.w - 2 });
-            x += d.w;
-          });
-          return yy + HEAD_H + 1;
-        }
-
-        y = tableHeader(y);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6);
-
-        rows.forEach((row, ri) => {
-          if (y + ROW_H > pageH - 12) {
-            doc.addPage();
-            drawHeader();
-            y = tableHeader(22);
-          }
-          if (ri % 2 === 0) {
-            doc.setFillColor(244, 246, 252);
-            doc.rect(M, y - 1, contentW, ROW_H, 'F');
-          }
-          doc.setTextColor(25, 30, 55);
-          let x = M;
-          sDefs.forEach(d => {
-            const val = row[d.key] != null ? String(row[d.key]) : '';
-            const maxChars = Math.floor(d.w / 1.6);
-            const display = val.length > maxChars ? val.slice(0, maxChars - 1) + '…' : val;
-            doc.text(display, d.right ? x + d.w - 1.5 : x + 1.5, y + 3.8, { align: d.right ? 'right' : 'left' });
-            x += d.w;
-          });
-          doc.setDrawColor(215, 220, 235);
-          doc.setLineWidth(0.15);
-          doc.line(M, y + ROW_H - 0.5, M + contentW, y + ROW_H - 0.5);
-          y += ROW_H;
-        });
-
-        // Summary bar
-        const totalAmt = rows.reduce((s, r) => s + (r['Amount Collected (₹)'] || 0), 0);
-        const totalPenalty = rows.reduce((s, r) => s + (r['Penalty (₹)'] || 0), 0);
-        doc.setFillColor(235, 238, 248);
-        doc.rect(M, y + 2, contentW, 8, 'F');
-        doc.setDrawColor(...NAVY);
-        doc.setLineWidth(0.3);
-        doc.rect(M, y + 2, contentW, 8, 'S');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(6.5);
-        doc.setTextColor(...NAVY);
-        const penStr = totalPenalty > 0 ? `   |   Penalty: ₹${Math.round(totalPenalty).toLocaleString('en-IN')}` : '';
-        doc.text(`Total: ${rows.length} records   |   Amount Collected: ₹${Math.round(totalAmt).toLocaleString('en-IN')}${penStr}`, M + 3, y + 7.5);
-
-        // Page numbers
-        const totalPages = doc.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-          doc.setPage(i);
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6);
-          doc.setTextColor(150, 155, 170);
-          doc.text(`Page ${i} of ${totalPages}  |  Confidential — BridgeLine Partners`, W / 2, pageH - 5, { align: 'center' });
-        }
-
-        doc.save(`BridgeLine-Collections-${label.replace(/\s/g,'-')}-${format(now, 'yyyyMMdd')}.pdf`);
-      }
-    } catch (err) {
-      console.error('Collection report failed:', err);
     }
     setDownloading(null);
   };
@@ -495,108 +293,14 @@ export default function Reports() {
 
         {/* Dashboard Reports tab */}
         {activeTab === 'dashboard' && (
-          <div className="p-5">
-            <div className="mb-4">
-              <h3 className="font-syne font-bold text-sm">Dashboard Performance Reports</h3>
-              <p className="text-xs text-muted-foreground mt-1">Portfolio overview on BridgeLine letterhead — same layout as the dashboard</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* MTD Card */}
-              <div className="border border-border rounded-xl p-4 flex items-center justify-between gap-4">
-                <div>
-                  <div className="font-semibold text-sm">MTD Report</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {format(new Date(), 'MMMM yyyy')} — month-wise breakdown, goalpost & cluster analytics
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-2 shrink-0"
-                  onClick={() => downloadDashboardReport('mtd')}
-                  disabled={!!downloading}
-                >
-                  {downloading === 'dashboard_mtd' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                  {downloading === 'dashboard_mtd' ? 'Generating...' : 'Download MTD'}
-                </Button>
-              </div>
-
-              {/* YTD Card */}
-              <div className="border border-border rounded-xl p-4 flex items-center justify-between gap-4">
-                <div>
-                  <div className="font-semibold text-sm">YTD Report</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {new Date().getFullYear()} — all months breakdown & cluster analytics
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-2 shrink-0"
-                  onClick={() => downloadDashboardReport('ytd')}
-                  disabled={!!downloading}
-                >
-                  {downloading === 'dashboard_ytd' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                  {downloading === 'dashboard_ytd' ? 'Generating...' : 'Download YTD'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Collection Report section */}
-            <div className="mt-6 border border-border rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <CalendarRange size={15} className="text-primary" />
-                <h4 className="font-syne font-bold text-sm">Collection Report</h4>
-                <span className="text-xs text-muted-foreground">— principal, charges, GST, penalty, UTR</span>
-              </div>
-
-              {/* Presets */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {PRESETS.map(p => (
-                  <button key={p.label} onClick={() => handlePreset(p)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                      collPreset === p.label
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-muted text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
-                    }`}>
-                    {p.label}
-                  </button>
-                ))}
-                <button onClick={() => setCollPreset('Custom')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                    collPreset === 'Custom'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
-                  }`}>
-                  Custom
-                </button>
-              </div>
-
-              {/* Date inputs */}
-              <div className="flex items-center gap-2 mb-4">
-                <Input type="date" value={collFrom} onChange={e => { setCollFrom(e.target.value); setCollPreset('Custom'); }} className="h-8 text-xs w-36" />
-                <span className="text-xs text-muted-foreground">to</span>
-                <Input type="date" value={collTo} onChange={e => { setCollTo(e.target.value); setCollPreset('Custom'); }} className="h-8 text-xs w-36" />
-                <span className="text-xs text-muted-foreground ml-1">
-                  ({collections.filter(c => c.credit_note_date && parseISO(c.credit_note_date) >= parseISO(collFrom) && parseISO(c.credit_note_date) <= parseISO(collTo)).length} records)
-                </span>
-              </div>
-
-              {/* Download buttons */}
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="gap-1.5"
-                  onClick={() => downloadCollectionReport('excel')} disabled={!!downloading}>
-                  {downloading === 'collection_excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} className="text-green-600" />}
-                  {downloading === 'collection_excel' ? 'Generating...' : 'Download Excel'}
-                </Button>
-                <Button size="sm" variant="outline" className="gap-1.5"
-                  onClick={() => downloadCollectionReport('pdf')} disabled={!!downloading}>
-                  {downloading === 'collection_pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} className="text-red-500" />}
-                  {downloading === 'collection_pdf' ? 'Generating...' : 'Download PDF'}
-                </Button>
-              </div>
-            </div>
-          </div>
+          <DashboardReportsTab
+            loans={loans}
+            collections={collections}
+            disbursals={disbursals}
+            downloading={downloading}
+            setDownloading={setDownloading}
+            downloadDashboardReport={downloadDashboardReport}
+          />
         )}
       </div>
 

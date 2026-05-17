@@ -39,15 +39,22 @@ function loanRows(loans) {
 
 function collRows(cols) {
   return cols.map(c => ({
-    'Loan #':            c.loan_number || '',
-    'Borrower':          c.borrower_name || '',
-    'Branch':            c.branch || '',
-    'Cluster':           c.cluster || '',
-    'Date':              c.credit_note_date || '',
-    'Amount (₹)':        c.amount_collected || 0,
-    'UTR / Ref':         c.credit_note_number || '',
-    'Payment Mode':      c.payment_mode ? c.payment_mode.replace(/_/g, ' ') : '',
-    'Loan Closed':       c.close_loan ? 'Yes' : 'No',
+    'Loan #':              c.loan_number || '',
+    'Borrower':            c.borrower_name || '',
+    'Branch':              c.branch || '',
+    'Cluster':             c.cluster || '',
+    'Date':                c.credit_note_date || '',
+    'Amount Collected (₹)': c.amount_collected || 0,
+    'Principal (₹)':       c.principal_component || 0,
+    'Charges (₹)':         c.charges_component || 0,
+    'GST (₹)':             c.gst_component || 0,
+    'Penalty (₹)':         c.penalty_component || 0,
+    'Bank':                c.bank_name || '',
+    'Payment Mode':        c.payment_mode ? c.payment_mode.replace(/_/g, ' ') : '',
+    'UTR / Ref':           c.credit_note_number || '',
+    'Closure Date':        c.closure_date || '',
+    'Loan Closed':         c.close_loan ? 'Yes' : 'No',
+    'Notes':               c.notes || '',
   }));
 }
 
@@ -131,15 +138,19 @@ async function buildPDF(loans, collections, filterLabel) {
   ];
 
   const COL_DEFS = [
-    { key: 'Loan #',       w: 26 },
-    { key: 'Borrower',     w: 44 },
-    { key: 'Branch',       w: 28 },
-    { key: 'Cluster',      w: 26 },
-    { key: 'Date',         w: 22 },
-    { key: 'Amount (₹)',   w: 26, right: true },
-    { key: 'UTR / Ref',    w: 55 },
-    { key: 'Payment Mode', w: 26 },
-    { key: 'Loan Closed',  w: 20 },
+    { key: 'Loan #',               w: 22 },
+    { key: 'Borrower',             w: 36 },
+    { key: 'Branch',               w: 22 },
+    { key: 'Cluster',              w: 20 },
+    { key: 'Date',                 w: 18 },
+    { key: 'Amount Collected (₹)', w: 24, right: true },
+    { key: 'Principal (₹)',        w: 18, right: true },
+    { key: 'Charges (₹)',          w: 16, right: true },
+    { key: 'GST (₹)',              w: 13, right: true },
+    { key: 'Penalty (₹)',          w: 14, right: true },
+    { key: 'Payment Mode',         w: 20 },
+    { key: 'UTR / Ref',            w: 38 },
+    { key: 'Loan Closed',          w: 14 },
   ];
 
   function drawTable(rows, defs, startY) {
@@ -248,7 +259,8 @@ async function buildPDF(loans, collections, filterLabel) {
   const cRows = collRows(collections);
   y = drawTable(cRows, COL_DEFS, 31);
   const collTotal = collections.reduce((s, c) => s + (c.amount_collected || 0), 0);
-  drawSummaryBar(collections.length, 'Total Collected', collTotal, y);
+  const penaltyTotal = collections.reduce((s, c) => s + (c.penalty_component || 0), 0);
+  drawSummaryBar(collections.length, `Total Collected${penaltyTotal > 0 ? ` (incl. ₹${fmtINR(penaltyTotal)} penalty)` : ''}`, collTotal, y);
 
   // Footer page numbers
   const totalPages = doc.getNumberOfPages();
@@ -452,6 +464,93 @@ export default function ExportPanel() {
           </Button>
         </div>
       </div>
+
+      {/* ── Collection Report preview ── */}
+      {fetched && (() => {
+        const { filteredCols } = applyFilters(allLoans, allCols);
+        if (!filteredCols.length) return null;
+        const totalCollected = filteredCols.reduce((s, c) => s + (c.amount_collected || 0), 0);
+        const totalPrincipal = filteredCols.reduce((s, c) => s + (c.principal_component || 0), 0);
+        const totalCharges   = filteredCols.reduce((s, c) => s + (c.charges_component || 0), 0);
+        const totalGST       = filteredCols.reduce((s, c) => s + (c.gst_component || 0), 0);
+        const totalPenalty   = filteredCols.reduce((s, c) => s + (c.penalty_component || 0), 0);
+        const closedCount    = filteredCols.filter(c => c.close_loan).length;
+
+        return (
+          <div className="border border-border rounded-xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-[hsl(var(--primary))] px-4 py-3 flex items-center justify-between">
+              <div>
+                <div className="text-white font-semibold text-sm">Collection Report</div>
+                <div className="text-white/70 text-xs mt-0.5">{filterLabel()}</div>
+              </div>
+              <div className="text-white/80 text-xs">{filteredCols.length} records</div>
+            </div>
+
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-0 border-b border-border">
+              {[
+                { label: 'Total Collected', value: `₹${fmtINR(totalCollected)}`, highlight: true },
+                { label: 'Principal',       value: `₹${fmtINR(totalPrincipal)}` },
+                { label: 'Charges + GST',   value: `₹${fmtINR(totalCharges + totalGST)}` },
+                { label: 'Penalty',         value: `₹${fmtINR(totalPenalty)}`, warn: totalPenalty > 0 },
+                { label: 'Loans Closed',    value: closedCount, sub: `of ${filteredCols.length}` },
+              ].map((s, i) => (
+                <div key={i} className={`px-4 py-3 border-r border-border last:border-r-0 ${s.highlight ? 'bg-accent/40' : ''}`}>
+                  <div className="text-xs text-muted-foreground">{s.label}</div>
+                  <div className={`text-sm font-bold mt-0.5 ${s.warn ? 'text-purple-700' : s.highlight ? 'text-primary' : 'text-foreground'}`}>
+                    {s.value}
+                  </div>
+                  {s.sub && <div className="text-xs text-muted-foreground">{s.sub}</div>}
+                </div>
+              ))}
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-muted/50 border-b border-border">
+                    {['Loan #','Borrower','Branch','Cluster','Date','Amount (₹)','Principal (₹)','Charges (₹)','GST (₹)','Penalty (₹)','Mode','UTR / Ref','Closed'].map(h => (
+                      <th key={h} className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCols.slice(0, 100).map((c, i) => (
+                    <tr key={c.id || i} className={`border-b border-border/60 ${i % 2 === 0 ? '' : 'bg-muted/20'}`}>
+                      <td className="px-3 py-2 font-mono text-xs">{c.loan_number || '—'}</td>
+                      <td className="px-3 py-2 font-medium">{c.borrower_name || '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{c.branch || '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{c.cluster || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{c.credit_note_date || '—'}</td>
+                      <td className="px-3 py-2 text-right font-semibold">{fmtINR(c.amount_collected)}</td>
+                      <td className="px-3 py-2 text-right">{fmtINR(c.principal_component)}</td>
+                      <td className="px-3 py-2 text-right">{fmtINR(c.charges_component)}</td>
+                      <td className="px-3 py-2 text-right">{fmtINR(c.gst_component)}</td>
+                      <td className={`px-3 py-2 text-right ${c.penalty_component > 0 ? 'text-purple-700 font-semibold' : 'text-muted-foreground'}`}>
+                        {c.penalty_component > 0 ? fmtINR(c.penalty_component) : '—'}
+                      </td>
+                      <td className="px-3 py-2 capitalize text-muted-foreground">{(c.payment_mode || '').replace(/_/g, ' ') || '—'}</td>
+                      <td className="px-3 py-2 font-mono text-xs max-w-[120px] truncate">{c.credit_note_number || '—'}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${c.close_loan ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                          {c.close_loan ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredCols.length > 100 && (
+                <div className="text-center text-xs text-muted-foreground py-3">
+                  Showing first 100 of {filteredCols.length} records — download Excel/PDF for full data
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

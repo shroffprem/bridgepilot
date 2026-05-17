@@ -69,6 +69,7 @@ export default function LoanDetail() {
   const [confirmReopen, setConfirmReopen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editData, setEditData] = useState({});
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const load = async () => {
     const [[l], cols] = await Promise.all([
@@ -109,6 +110,11 @@ export default function LoanDetail() {
       rate: loan.rate || 0.5,
     });
     setEditOpen(true);
+  };
+
+  const handleDelete = async () => {
+    await base44.entities.Loan.delete(id);
+    navigate('/loans');
   };
 
   const handleEditSave = async () => {
@@ -374,6 +380,15 @@ export default function LoanDetail() {
       )}
 
       <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this case?"
+        description={`This will permanently delete the case for ${loan.borrower_name}. This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+        onConfirm={handleDelete}
+      />
+      <ConfirmDialog
         open={confirmOverdue}
         onOpenChange={setConfirmOverdue}
         title="Mark as Overdue?"
@@ -442,9 +457,12 @@ export default function LoanDetail() {
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2 mt-2">
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditSave}>Save Changes</Button>
+          <div className="flex justify-between mt-2">
+            <Button variant="destructive" onClick={() => { setEditOpen(false); setConfirmDelete(true); }}>Delete Case</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button onClick={handleEditSave}>Save Changes</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

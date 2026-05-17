@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { format, differenceInDays, startOfMonth, startOfYear, parseISO, isWithinInterval } from 'date-fns';
+import { format, differenceInDays, startOfMonth, startOfYear, parseISO, isWithinInterval,
+  subMonths, endOfMonth, startOfQuarter, endOfQuarter, startOfDay, endOfDay } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { IndianRupee, TrendingUp, Users, AlertTriangle, CreditCard, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { IndianRupee, TrendingUp, Users, AlertTriangle, CreditCard, Download, FileSpreadsheet, FileText, CalendarRange } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import ExportPanel from '@/components/reports/ExportPanel';
 import * as XLSX from 'xlsx';
 
@@ -66,6 +68,24 @@ export default function Reports() {
   const [downloading, setDownloading] = useState(null);
   const [activeTab, setActiveTab] = useState('mis');
 
+  const now = new Date();
+  const PRESETS = [
+    { label: 'Today',        from: startOfDay(now),                        to: endOfDay(now) },
+    { label: 'This Month',   from: startOfMonth(now),                      to: now },
+    { label: 'Last Month',   from: startOfMonth(subMonths(now, 1)),        to: endOfMonth(subMonths(now, 1)) },
+    { label: 'This Quarter', from: startOfQuarter(now),                    to: now },
+    { label: 'This Year',    from: startOfYear(now),                       to: now },
+  ];
+  const [collPreset, setCollPreset] = useState('This Month');
+  const [collFrom, setCollFrom]     = useState(format(startOfMonth(now), 'yyyy-MM-dd'));
+  const [collTo, setCollTo]         = useState(format(now, 'yyyy-MM-dd'));
+
+  const handlePreset = (preset) => {
+    setCollPreset(preset.label);
+    setCollFrom(format(preset.from, 'yyyy-MM-dd'));
+    setCollTo(format(preset.to, 'yyyy-MM-dd'));
+  };
+
   useEffect(() => {
     Promise.all([
       base44.entities.Loan.list(),
@@ -122,15 +142,19 @@ export default function Reports() {
     setDownloading(null);
   };
 
-  const downloadCollectionReport = async (period, fileType) => {
-    const key = `collection_${period}_${fileType}`;
+  const downloadCollectionReport = async (fileType) => {
+    const key = `collection_${fileType}`;
     setDownloading(key);
     try {
-      const now = new Date();
-      const from = period === 'mtd' ? startOfMonth(now) : startOfYear(now);
+      const from = parseISO(collFrom);
+      const to   = parseISO(collTo);
+      const label = collPreset === 'Custom'
+        ? `${collFrom} to ${collTo}`
+        : collPreset;
       const filtered = collections.filter(c => {
         if (!c.credit_note_date) return false;
-        return isWithinInterval(parseISO(c.credit_note_date), { start: from, end: now });
+        const d = parseISO(c.credit_note_date);
+        return d >= from && d <= to;
       });
 
       const rows = filtered.map(c => ({
@@ -155,7 +179,7 @@ export default function Reports() {
       if (fileType === 'excel') {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Collections');
-        XLSX.writeFile(wb, `BridgeLine-Collections-${period.toUpperCase()}-${format(now, 'yyyyMMdd')}.xlsx`);
+        XLSX.writeFile(wb, `BridgeLine-Collections-${label.replace(/\s/g,'-')}-${format(now, 'yyyyMMdd')}.xlsx`);
       } else {
         const { jsPDF } = await import('jspdf');
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -165,7 +189,6 @@ export default function Reports() {
         const contentW = W - M * 2;
         const NAVY = [26, 39, 68];
         const GOLD = [201, 168, 76];
-        const label = period === 'mtd' ? format(now, 'MMMM yyyy') : `YTD ${now.getFullYear()}`;
         const today = format(now, 'dd-MMM-yyyy');
 
         function drawHeader() {
@@ -293,7 +316,7 @@ export default function Reports() {
           doc.text(`Page ${i} of ${totalPages}  |  Confidential — BridgeLine Partners`, W / 2, pageH - 5, { align: 'center' });
         }
 
-        doc.save(`BridgeLine-Collections-${period.toUpperCase()}-${format(now, 'yyyyMMdd')}.pdf`);
+        doc.save(`BridgeLine-Collections-${label.replace(/\s/g,'-')}-${format(now, 'yyyyMMdd')}.pdf`);
       }
     } catch (err) {
       console.error('Collection report failed:', err);
@@ -520,49 +543,57 @@ export default function Reports() {
             </div>
 
             {/* Collection Report section */}
-            <div className="mt-6">
-              <h4 className="font-syne font-bold text-sm mb-1">Collection Report</h4>
-              <p className="text-xs text-muted-foreground mb-3">Detailed breakdown of all collections — principal, charges, GST, penalty, UTR</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Collection MTD */}
-                <div className="border border-border rounded-xl p-4">
-                  <div className="mb-3">
-                    <div className="font-semibold text-sm">MTD Collections</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{format(new Date(), 'MMMM yyyy')}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="gap-1.5 flex-1"
-                      onClick={() => downloadCollectionReport('mtd', 'excel')} disabled={!!downloading}>
-                      {downloading === 'collection_mtd_excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} className="text-green-600" />}
-                      {downloading === 'collection_mtd_excel' ? 'Generating...' : 'Excel'}
-                    </Button>
-                    <Button size="sm" variant="outline" className="gap-1.5 flex-1"
-                      onClick={() => downloadCollectionReport('mtd', 'pdf')} disabled={!!downloading}>
-                      {downloading === 'collection_mtd_pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} className="text-red-500" />}
-                      {downloading === 'collection_mtd_pdf' ? 'Generating...' : 'PDF'}
-                    </Button>
-                  </div>
-                </div>
+            <div className="mt-6 border border-border rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CalendarRange size={15} className="text-primary" />
+                <h4 className="font-syne font-bold text-sm">Collection Report</h4>
+                <span className="text-xs text-muted-foreground">— principal, charges, GST, penalty, UTR</span>
+              </div>
 
-                {/* Collection YTD */}
-                <div className="border border-border rounded-xl p-4">
-                  <div className="mb-3">
-                    <div className="font-semibold text-sm">YTD Collections</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Jan – {format(new Date(), 'MMM yyyy')}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="gap-1.5 flex-1"
-                      onClick={() => downloadCollectionReport('ytd', 'excel')} disabled={!!downloading}>
-                      {downloading === 'collection_ytd_excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} className="text-green-600" />}
-                      {downloading === 'collection_ytd_excel' ? 'Generating...' : 'Excel'}
-                    </Button>
-                    <Button size="sm" variant="outline" className="gap-1.5 flex-1"
-                      onClick={() => downloadCollectionReport('ytd', 'pdf')} disabled={!!downloading}>
-                      {downloading === 'collection_ytd_pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} className="text-red-500" />}
-                      {downloading === 'collection_ytd_pdf' ? 'Generating...' : 'PDF'}
-                    </Button>
-                  </div>
-                </div>
+              {/* Presets */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {PRESETS.map(p => (
+                  <button key={p.label} onClick={() => handlePreset(p)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                      collPreset === p.label
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
+                    }`}>
+                    {p.label}
+                  </button>
+                ))}
+                <button onClick={() => setCollPreset('Custom')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                    collPreset === 'Custom'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
+                  }`}>
+                  Custom
+                </button>
+              </div>
+
+              {/* Date inputs */}
+              <div className="flex items-center gap-2 mb-4">
+                <Input type="date" value={collFrom} onChange={e => { setCollFrom(e.target.value); setCollPreset('Custom'); }} className="h-8 text-xs w-36" />
+                <span className="text-xs text-muted-foreground">to</span>
+                <Input type="date" value={collTo} onChange={e => { setCollTo(e.target.value); setCollPreset('Custom'); }} className="h-8 text-xs w-36" />
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({collections.filter(c => c.credit_note_date && parseISO(c.credit_note_date) >= parseISO(collFrom) && parseISO(c.credit_note_date) <= parseISO(collTo)).length} records)
+                </span>
+              </div>
+
+              {/* Download buttons */}
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="gap-1.5"
+                  onClick={() => downloadCollectionReport('excel')} disabled={!!downloading}>
+                  {downloading === 'collection_excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} className="text-green-600" />}
+                  {downloading === 'collection_excel' ? 'Generating...' : 'Download Excel'}
+                </Button>
+                <Button size="sm" variant="outline" className="gap-1.5"
+                  onClick={() => downloadCollectionReport('pdf')} disabled={!!downloading}>
+                  {downloading === 'collection_pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} className="text-red-500" />}
+                  {downloading === 'collection_pdf' ? 'Generating...' : 'Download PDF'}
+                </Button>
               </div>
             </div>
           </div>

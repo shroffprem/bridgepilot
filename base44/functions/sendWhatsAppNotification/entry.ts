@@ -1,12 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
-const AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
-const FROM_NUMBER = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "whatsapp:+14155238886";
-
 async function sendWhatsApp(to, message) {
+  const ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
+  const AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const FROM_NUMBER = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "whatsapp:+14155238886";
+
   if (!ACCOUNT_SID || !AUTH_TOKEN) {
-    return { success: false, error: "Twilio credentials not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_WHATSAPP_FROM in environment variables." };
+    return { success: false, error: "Twilio credentials not configured." };
   }
 
   const toNumber = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;

@@ -44,7 +44,7 @@ export default function RepaymentAgent() {
 
   // Load conversations on mount
   useEffect(() => {
-    base44.agents.listConversations({ agent_name: 'repayment_tracker' })
+    base44.agents.listConversations({ agent_name: 'BridgePilot' })
       .then(convs => {
         setConversations(convs || []);
         setLoadingConvs(false);
@@ -68,7 +68,7 @@ export default function RepaymentAgent() {
 
   const startNewConversation = async () => {
     const conv = await base44.agents.createConversation({
-      agent_name: 'repayment_tracker',
+      agent_name: 'BridgePilot',
       metadata: { name: `Chat — ${format(new Date(), 'dd MMM yyyy, h:mm a')}` },
     });
     setConversations(prev => [conv, ...prev]);
@@ -87,7 +87,7 @@ export default function RepaymentAgent() {
     let conv = activeConv;
     if (!conv) {
       conv = await base44.agents.createConversation({
-        agent_name: 'repayment_tracker',
+        agent_name: 'BridgePilot',
         metadata: { name: `Chat — ${format(new Date(), 'dd MMM yyyy, h:mm a')}` },
       });
       setConversations(prev => [conv, ...prev]);
@@ -113,7 +113,7 @@ export default function RepaymentAgent() {
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2 mb-3">
             <Bot size={16} className="text-primary" />
-            <span className="font-syne font-bold text-sm">Repayment Tracker</span>
+            <span className="font-syne font-bold text-sm">BridgePilot</span>
           </div>
           <Button size="sm" className="w-full gap-2" onClick={startNewConversation}>
             <Plus size={14} /> New Chat
@@ -148,9 +148,9 @@ export default function RepaymentAgent() {
               <Bot size={30} className="text-primary" />
             </div>
             <div>
-              <h2 className="font-syne font-bold text-lg">Repayment Tracker</h2>
+              <h2 className="font-syne font-bold text-lg">BridgePilot</h2>
               <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                Ask about loan statuses, outstanding amounts, overdue cases, or payment history for any borrower.
+                Ask about loan status, pending approvals, disbursals, repayments, overdue cases, and more.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center max-w-md">

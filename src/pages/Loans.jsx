@@ -109,14 +109,12 @@ export default function Loans() {
           <h1 className="font-syne font-bold text-xl text-foreground">Cases</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{loans.length} total cases</p>
         </div>
-        {isAdmin && (
-          <Link to="/loans/new">
-            <Button size="sm" className="gap-1.5">
-              <Plus size={15} />
-              New Case
-            </Button>
-          </Link>
-        )}
+        <Link to="/loans/new">
+          <Button size="sm" className="gap-1.5">
+            <Plus size={15} />
+            New Case
+          </Button>
+        </Link>
       </div>
 
       {/* Status tabs */}

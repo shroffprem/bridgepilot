@@ -19,7 +19,7 @@
     },
     "amount_collected": {
       "type": "number",
-      "description": "Total amount received (\u20b9)"
+      "description": "Total amount received (\u20b9) \u2014 may exceed outstanding if penalty collected"
     },
     "principal_component": {
       "type": "number"
@@ -29,6 +29,11 @@
     },
     "gst_component": {
       "type": "number"
+    },
+    "penalty_component": {
+      "type": "number",
+      "description": "Additional penalty / delayed payment charges collected above outstanding (\u20b9)",
+      "default": 0
     },
     "credit_note_number": {
       "type": "string",

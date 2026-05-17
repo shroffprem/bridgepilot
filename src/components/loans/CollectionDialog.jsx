@@ -28,6 +28,7 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
     principal_component: loan?.principal || '',
     charges_component: charges || '',
     gst_component: gst || '',
+    penalty_component: 0,
     credit_note_number: '',
     credit_note_date: format(new Date(), 'yyyy-MM-dd'),
     payment_mode: 'bank_transfer',
@@ -40,6 +41,7 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
   const amountCollected = parseFloat(form.amount_collected) || 0;
   const isPartPayment = amountCollected > 0 && amountCollected < totalDue;
   const remainingAfter = Math.max(0, totalDue - amountCollected);
+  const penaltyAmount = amountCollected > totalDue ? amountCollected - totalDue : 0;
 
   const set = (field) => (e) => setForm(p => ({ ...p, [field]: e.target.value }));
 
@@ -124,6 +126,7 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
       principal_component: parseFloat(form.principal_component) || 0,
       charges_component: parseFloat(form.charges_component) || 0,
       gst_component: parseFloat(form.gst_component) || 0,
+      penalty_component: parseFloat(form.penalty_component) || 0,
       recorded_by: me?.full_name || me?.email || '',
     });
     if (form.close_loan) {
@@ -180,13 +183,16 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
                   setForm(p => ({
                     ...p,
                     amount_collected: val,
-                    // auto-uncheck close_loan if it's a part payment
+                    penalty_component: amt > totalDue ? parseFloat((amt - totalDue).toFixed(2)) : 0,
                     close_loan: amt >= totalDue ? p.close_loan : false,
                   }));
                 }}
               />
               {isPartPayment && (
                 <p className="text-xs text-amber-600 font-medium">Part payment — {formatINR(remainingAfter)} will remain outstanding</p>
+              )}
+              {penaltyAmount > 0 && (
+                <p className="text-xs text-purple-700 font-medium">+{formatINR(penaltyAmount)} recorded as penalty</p>
               )}
             </div>
             <div className="space-y-1">
@@ -200,7 +206,7 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label>Principal (₹)</Label>
               <Input type="number" value={form.principal_component} onChange={set('principal_component')} />
@@ -212,6 +218,11 @@ export default function CollectionDialog({ loan, open, onOpenChange, onSaved }) 
             <div className="space-y-1">
               <Label>GST (₹)</Label>
               <Input type="number" value={form.gst_component} onChange={set('gst_component')} />
+            </div>
+            <div className="space-y-1">
+              <Label>Penalty (₹)</Label>
+              <Input type="number" value={form.penalty_component} onChange={set('penalty_component')}
+                className={form.penalty_component > 0 ? 'border-purple-400 bg-purple-50' : ''} />
             </div>
           </div>
 

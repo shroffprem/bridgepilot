@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
 const AUTH_TOKEN  = Deno.env.get("TWILIO_AUTH_TOKEN");
-const FROM_NUMBER = Deno.env.get("TWILIO_WHATSAPP_FROM") || "whatsapp:+14155238886";
+const FROM_NUMBER = Deno.env.get("TWILIO_WHATSAPP_NUMBER") || "whatsapp:+14155238886";
 
 async function sendWhatsApp(to, message) {
   if (!ACCOUNT_SID || !AUTH_TOKEN) {

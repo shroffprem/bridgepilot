@@ -10,9 +10,10 @@ export function useCurrentUser() {
   }, []);
 
   const isAdmin = user?.role === 'admin';
+  const isSalesOfficer = user?.role === 'sales_officer';
   const isBranchManager = user?.role === 'branch_manager';
   const isClusterManager = user?.role === 'cluster_manager';
   const isZonalManager = user?.role === 'zonal_manager';
 
-  return { user, loading, isAdmin, isBranchManager, isClusterManager, isZonalManager };
+  return { user, loading, isAdmin, isSalesOfficer, isBranchManager, isClusterManager, isZonalManager };
 }

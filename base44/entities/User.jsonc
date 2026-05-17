@@ -6,27 +6,26 @@
       "type": "string",
       "enum": [
         "admin",
+        "sales_officer",
         "branch_manager",
         "cluster_manager",
-        "zonal_manager"
+        "zonal_manager",
+        "managing_partner"
       ],
-      "default": "branch_manager"
-    },
-    "phone": {
-      "type": "string",
-      "description": "Mobile number for WhatsApp notifications (10 digits, India)"
+      "default": "sales_officer",
+      "description": "User role in the approval hierarchy"
     },
     "branch": {
       "type": "string",
-      "description": "Branch this user is assigned to"
+      "description": "Branch assigned to this user"
     },
     "cluster": {
       "type": "string",
-      "description": "Cluster this user is assigned to"
+      "description": "Cluster assigned to this user"
     },
     "zone": {
       "type": "string",
-      "description": "Zone this user is assigned to"
+      "description": "Zone assigned to this user"
     }
   }
 }

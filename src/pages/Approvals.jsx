@@ -22,7 +22,6 @@ function LoanRow({ loan, onUpdate, navigate }) {
 
   return (
     <div className="border-b border-border last:border-0">
-      {/* Summary Row */}
       <div
         className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/20 cursor-pointer transition-colors"
         onClick={() => setExpanded(e => !e)}
@@ -34,9 +33,7 @@ function LoanRow({ loan, onUpdate, navigate }) {
           </div>
           <div className="text-right md:text-left">
             <div className="font-bold text-sm">{formatINR(loan.principal)}</div>
-            {requiresZonal && (
-              <div className="text-xs text-orange-600 font-medium">Zonal required</div>
-            )}
+            {requiresZonal && <div className="text-xs text-orange-600 font-medium">Zonal required</div>}
           </div>
           <div className="hidden md:block text-sm text-muted-foreground">{loan.branch || '—'}</div>
           <div className="hidden md:block text-xs text-muted-foreground">
@@ -55,8 +52,6 @@ function LoanRow({ loan, onUpdate, navigate }) {
           </Button>
         </div>
       </div>
-
-      {/* Expanded Panel */}
       {expanded && (
         <div className="bg-muted/20 border-t border-border px-5 py-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <ApprovalTrail loan={loan} />
@@ -67,14 +62,12 @@ function LoanRow({ loan, onUpdate, navigate }) {
   );
 }
 
-function LoanTable({ items, title, onUpdate, navigate }) {
+function LoanTable({ items, title, colorClass, onUpdate, navigate }) {
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center gap-3">
         <h3 className="font-syne font-semibold text-sm text-foreground">{title}</h3>
-        <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded-full">
-          {items.length}
-        </span>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${colorClass}`}>{items.length}</span>
         <span className="text-xs text-muted-foreground ml-1">Click a row to review & act</span>
       </div>
       {items.length === 0 ? (
@@ -84,13 +77,8 @@ function LoanTable({ items, title, onUpdate, navigate }) {
         </div>
       ) : (
         <div>
-          {/* Header */}
           <div className="bg-muted/40 border-b border-border px-5 py-2 hidden md:grid grid-cols-5 gap-3 text-xs text-muted-foreground uppercase font-medium tracking-wide">
-            <div>Borrower</div>
-            <div>Amount</div>
-            <div>Branch</div>
-            <div>Submitted</div>
-            <div>Status</div>
+            <div>Borrower</div><div>Amount</div><div>Branch</div><div>Submitted</div><div>Status</div>
           </div>
           {items.map(loan => (
             <LoanRow key={loan.id} loan={loan} onUpdate={onUpdate} navigate={navigate} />
@@ -105,23 +93,27 @@ export default function Approvals() {
   const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { user, isClusterManager, isZonalManager, isAdmin } = useCurrentUser();
+  const { user, isAdmin, isBranchManager, isClusterManager, isZonalManager } = useCurrentUser();
 
   const load = () =>
     base44.entities.Loan.list('-created_date').then(all => {
-      const pending = all.filter(l => ['pending_cluster_approval', 'pending_zonal_approval'].includes(l.status));
-      // Cluster managers only see their cluster's pending loans
-      if (isClusterManager && user?.cluster) {
+      const pending = all.filter(l =>
+        ['pending_branch_approval', 'pending_cluster_approval', 'pending_zonal_approval'].includes(l.status)
+      );
+      // Cluster managers only see their cluster's loans; branch managers only their branch
+      if (isClusterManager && !isAdmin && user?.cluster) {
         setLoans(pending.filter(l => l.cluster?.toLowerCase() === user.cluster?.toLowerCase()));
+      } else if (isBranchManager && !isAdmin && user?.branch) {
+        setLoans(pending.filter(l => l.branch?.toLowerCase() === user.branch?.toLowerCase()));
       } else {
         setLoans(pending);
       }
       setLoading(false);
     });
 
-  useEffect(() => { load(); }, [isClusterManager, user?.cluster]);
+  useEffect(() => { load(); }, [isAdmin, isBranchManager, isClusterManager, user?.cluster, user?.branch]);
 
-  // Zonal managers only see zonal queue; cluster managers only see cluster queue
+  const branchPending  = loans.filter(l => l.status === 'pending_branch_approval');
   const clusterPending = loans.filter(l => l.status === 'pending_cluster_approval');
   const zonalPending   = loans.filter(l => l.status === 'pending_zonal_approval');
 
@@ -131,13 +123,20 @@ export default function Approvals() {
     </div>
   );
 
+  const showBranchQueue  = isAdmin || isBranchManager;
   const showClusterQueue = isAdmin || isClusterManager;
   const showZonalQueue   = isAdmin || isZonalManager;
 
   return (
     <div className="space-y-5">
       {/* Summary strip */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
+        {showBranchQueue && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="text-xs text-blue-700 font-medium">Pending Branch Approval</div>
+            <div className="text-2xl font-bold font-syne text-blue-800 mt-1">{branchPending.length}</div>
+          </div>
+        )}
         {showClusterQueue && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
             <div className="text-xs text-yellow-700 font-medium">Pending Cluster Approval</div>
@@ -152,10 +151,20 @@ export default function Approvals() {
         )}
       </div>
 
+      {showBranchQueue && (
+        <LoanTable
+          items={branchPending}
+          title={`Branch Manager Queue${isBranchManager && user?.branch ? ` — ${user.branch}` : ''}`}
+          colorClass="bg-blue-100 text-blue-800"
+          onUpdate={load}
+          navigate={navigate}
+        />
+      )}
       {showClusterQueue && (
         <LoanTable
           items={clusterPending}
-          title={`Cluster Manager Approval Queue${isClusterManager && user?.cluster ? ` — ${user.cluster}` : ''}`}
+          title={`Cluster Manager Queue${isClusterManager && user?.cluster ? ` — ${user.cluster}` : ''}`}
+          colorClass="bg-yellow-100 text-yellow-800"
           onUpdate={load}
           navigate={navigate}
         />
@@ -163,7 +172,8 @@ export default function Approvals() {
       {showZonalQueue && (
         <LoanTable
           items={zonalPending}
-          title="Zonal Manager Approval Queue (Loans > ₹10L)"
+          title="Zonal Manager Queue (Loans > ₹10L)"
+          colorClass="bg-orange-100 text-orange-800"
           onUpdate={load}
           navigate={navigate}
         />

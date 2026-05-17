@@ -100,6 +100,14 @@ export default function LoanForm() {
     const loanNumber = `BLP-${ts}`;
     const dateStr = format(new Date(), 'ddMMyy');
     const disbursalId = `BLP/${dateStr}/${ts}`;
+    const me = await base44.auth.me();
+    const myRole = me?.role;
+    // Branch managers & above skip branch stage; SOs/others start at branch approval
+    const initialStatus = (myRole === 'branch_manager')
+      ? 'pending_cluster_approval'
+      : 'pending_branch_approval';
+    const initialStage = (myRole === 'branch_manager') ? 'cluster' : 'branch';
+
     await base44.entities.Loan.create({
       ...form,
       principal,
@@ -111,8 +119,9 @@ export default function LoanForm() {
       net_weight: parseFloat(form.net_weight) || 0,
       loan_number: loanNumber,
       disbursal_id: disbursalId,
-      status: 'pending_cluster_approval',
-      submitted_by: (await base44.auth.me())?.full_name || '',
+      status: initialStatus,
+      approval_stage: initialStage,
+      submitted_by: me?.full_name || me?.email || '',
     });
     navigate('/loans');
   };

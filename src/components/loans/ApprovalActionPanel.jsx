@@ -12,34 +12,79 @@ export default function ApprovalActionPanel({ loan, onUpdate }) {
   const [rejectNotes, setRejectNotes] = useState('');
   const [showReject, setShowReject] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { user, isZonalManager } = useCurrentUser();
+  const { user, isAdmin, isBranchManager, isClusterManager, isZonalManager } = useCurrentUser();
 
+  const isBranchStage  = loan.status === 'pending_branch_approval';
   const isClusterStage = loan.status === 'pending_cluster_approval';
   const isZonalStage   = loan.status === 'pending_zonal_approval';
 
-  // Zonal managers can only act on zonal-stage loans; cluster managers on cluster-stage
-  if (!isClusterStage && !isZonalStage) return null;
-  if (isZonalManager && !isZonalStage) return <div className="text-xs text-muted-foreground p-4">Awaiting cluster approval first.</div>;
+  // No pending action needed
+  if (!isBranchStage && !isClusterStage && !isZonalStage) return null;
+
+  // Gate access: branch managers only act on branch stage; cluster managers on cluster stage; zonal on zonal
+  if (!isAdmin) {
+    if (isBranchStage && !isBranchManager)   return <div className="text-xs text-muted-foreground p-4">Awaiting Branch Manager approval.</div>;
+    if (isClusterStage && !isClusterManager)  return <div className="text-xs text-muted-foreground p-4">Awaiting Cluster Manager approval.</div>;
+    if (isZonalStage && !isZonalManager)      return <div className="text-xs text-muted-foreground p-4">Awaiting Zonal Manager approval.</div>;
+  }
 
   const requiresZonal = (loan.principal || 0) >= 1000000;
-  const actorName = user?.full_name || user?.email || (isClusterStage ? 'Cluster Manager' : 'Zonal Manager');
-  const role = isClusterStage ? 'Cluster Manager' : 'Zonal Manager';
-  const nextStage = isClusterStage && requiresZonal ? 'Zonal Manager' : null;
+  const actorName = user?.full_name || user?.email || 'Manager';
+
+  const stageColor = isBranchStage ? 'blue' : isClusterStage ? 'yellow' : 'orange';
+  const roleLabel  = isBranchStage ? 'Branch Manager' : isClusterStage ? 'Cluster Manager' : 'Zonal Manager';
+
+  const colorMap = {
+    blue:   { border: 'border-blue-200',   bg: 'bg-blue-50',   title: 'text-blue-800',   icon: 'text-blue-600' },
+    yellow: { border: 'border-yellow-200', bg: 'bg-yellow-50', title: 'text-yellow-800', icon: 'text-yellow-600' },
+    orange: { border: 'border-orange-200', bg: 'bg-orange-50', title: 'text-orange-800', icon: 'text-orange-600' },
+  };
+  const c = colorMap[stageColor];
 
   const handleApprove = async () => {
     setSaving(true);
     const now = new Date().toISOString();
-    if (isClusterStage) {
-      await base44.entities.Loan.update(loan.id, requiresZonal
-        ? { status: 'pending_zonal_approval', approval_stage: 'zonal', cluster_manager_notes: notes, approved_by_cluster: actorName, cluster_approved_date: now }
-        : { status: 'open', approval_stage: 'complete', cluster_manager_notes: notes, approved_by_cluster: actorName, cluster_approved_date: now }
-      );
-    } else {
+
+    if (isBranchStage) {
+      // Branch approves → goes to cluster
       await base44.entities.Loan.update(loan.id, {
-        status: 'open', approval_stage: 'complete',
-        zonal_manager_notes: notes, approved_by_zonal: actorName, zonal_approved_date: now
+        status: 'pending_cluster_approval',
+        approval_stage: 'cluster',
+        branch_manager_notes: notes,
+        approved_by_branch: actorName,
+        branch_approved_date: now,
+      });
+    } else if (isClusterStage) {
+      if (requiresZonal) {
+        // Cluster approves, needs zonal
+        await base44.entities.Loan.update(loan.id, {
+          status: 'pending_zonal_approval',
+          approval_stage: 'zonal',
+          cluster_manager_notes: notes,
+          approved_by_cluster: actorName,
+          cluster_approved_date: now,
+        });
+      } else {
+        // Cluster is final approval → open
+        await base44.entities.Loan.update(loan.id, {
+          status: 'open',
+          approval_stage: 'complete',
+          cluster_manager_notes: notes,
+          approved_by_cluster: actorName,
+          cluster_approved_date: now,
+        });
+      }
+    } else if (isZonalStage) {
+      // Zonal final approval → open
+      await base44.entities.Loan.update(loan.id, {
+        status: 'open',
+        approval_stage: 'complete',
+        zonal_manager_notes: notes,
+        approved_by_zonal: actorName,
+        zonal_approved_date: now,
       });
     }
+
     setSaving(false);
     setNotes('');
     onUpdate();
@@ -55,15 +100,18 @@ export default function ApprovalActionPanel({ loan, onUpdate }) {
     onUpdate();
   };
 
+  const nextStageLabel = isBranchStage
+    ? 'Cluster Manager'
+    : isClusterStage && requiresZonal
+    ? 'Zonal Manager'
+    : null;
+
   return (
-    <div className={cn(
-      'rounded-xl border p-5 space-y-4',
-      isClusterStage ? 'bg-yellow-50 border-yellow-200' : 'bg-orange-50 border-orange-200'
-    )}>
+    <div className={cn('rounded-xl border p-5 space-y-4', c.border, c.bg)}>
       <div className="flex items-center gap-2">
-        <AlertTriangle size={16} className={isClusterStage ? 'text-yellow-600' : 'text-orange-600'} />
-        <h3 className={cn('font-syne font-semibold text-sm', isClusterStage ? 'text-yellow-800' : 'text-orange-800')}>
-          Action Required — {role}
+        <AlertTriangle size={16} className={c.icon} />
+        <h3 className={cn('font-syne font-semibold text-sm', c.title)}>
+          Action Required — {roleLabel}
         </h3>
       </div>
 
@@ -81,7 +129,7 @@ export default function ApprovalActionPanel({ loan, onUpdate }) {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
-              placeholder="Add any comments or conditions for approval…"
+              placeholder="Add any comments or conditions…"
               className="bg-white"
             />
           </div>
@@ -92,7 +140,7 @@ export default function ApprovalActionPanel({ loan, onUpdate }) {
               disabled={saving}
             >
               <CheckCircle2 size={15} />
-              {saving ? 'Processing…' : nextStage ? `Approve & Escalate to ${nextStage}` : 'Approve Loan'}
+              {saving ? 'Processing…' : nextStageLabel ? `Approve & Send to ${nextStageLabel}` : 'Approve Loan'}
             </Button>
             <Button
               variant="outline"
@@ -117,11 +165,7 @@ export default function ApprovalActionPanel({ loan, onUpdate }) {
             />
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="destructive"
-              onClick={handleReject}
-              disabled={saving || !rejectNotes.trim()}
-            >
+            <Button variant="destructive" onClick={handleReject} disabled={saving || !rejectNotes.trim()}>
               {saving ? 'Rejecting…' : 'Confirm Rejection'}
             </Button>
             <Button variant="ghost" onClick={() => setShowReject(false)}>Cancel</Button>

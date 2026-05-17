@@ -10,7 +10,7 @@ import { base44 } from '@/api/base44Client';
 const ALL_NAV = [
   { label: 'Dashboard',        icon: LayoutDashboard, path: '/',          roles: ['admin'] },
   { label: 'Cases',            icon: FileText,        path: '/loans',     roles: ['admin', 'branch_manager'] },
-  { label: 'Approvals',        icon: CheckSquare,     path: '/approvals', roles: ['admin', 'cluster_manager', 'zonal_manager'] },
+  { label: 'Approvals',        icon: CheckSquare,     path: '/approvals', roles: ['admin', 'branch_manager', 'cluster_manager', 'zonal_manager'] },
   { label: 'Reports',          icon: BarChart2,       path: '/reports',   roles: ['admin'] },
   { label: 'Borrowers',        icon: Users,           path: '/borrowers', roles: ['admin'] },
   { label: 'Master Directory', icon: Building2,       path: '/directory', roles: ['admin'] },

@@ -122,6 +122,7 @@
     "status": {
       "type": "string",
       "enum": [
+        "pending_branch_approval",
         "pending_cluster_approval",
         "pending_zonal_approval",
         "open",
@@ -130,8 +131,8 @@
         "rejected",
         "follow_up"
       ],
-      "default": "pending_cluster_approval",
-      "description": "pending_cluster_approval = awaiting cluster manager; pending_zonal_approval = awaiting zonal (>\u20b910L); open = active/disbursed; closed = fully collected; overdue = past due; rejected = declined; follow_up = requires attention"
+      "default": "pending_branch_approval",
+      "description": "pending_branch_approval = awaiting branch manager; pending_cluster_approval = awaiting cluster manager; pending_zonal_approval = awaiting zonal (>\u20b910L); open = active/disbursed; closed = fully collected; overdue = past due; rejected = declined; follow_up = requires attention"
     },
     "approval_stage": {
       "type": "string",
@@ -141,7 +142,18 @@
         "zonal",
         "complete"
       ],
-      "default": "cluster"
+      "default": "branch"
+    },
+    "branch_manager_notes": {
+      "type": "string"
+    },
+    "approved_by_branch": {
+      "type": "string"
+    },
+    "branch_approved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when branch manager approved"
     },
     "cluster_manager_notes": {
       "type": "string"

@@ -79,8 +79,24 @@
   }
   body {
     @apply bg-background text-foreground font-inter;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
   }
   h1, h2, h3 {
     @apply font-syne;
+  }
+  button, a, nav, [role="button"] {
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Allow small inline badges/spans to not be affected */
+  span button, td button {
+    min-height: unset;
+    min-width: unset;
   }
 }

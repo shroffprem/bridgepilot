@@ -1,6 +1,7 @@
 import { Outlet, useLocation, Link } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useDarkModeSync } from '@/hooks/useDarkModeSync';
 import {
   LayoutDashboard, FileText, BarChart2, CheckSquare, ShieldCheck
 } from 'lucide-react';
@@ -15,6 +16,7 @@ const BOTTOM_NAV = [
 ];
 
 export default function AppLayout() {
+  useDarkModeSync();
   const location = useLocation();
   const { user } = useCurrentUser();
   const role = user?.role || 'admin';

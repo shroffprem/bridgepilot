@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import PullToRefresh from '@/components/ui/PullToRefresh';
 import { format } from 'date-fns';
 import { formatINR, calcCharges, calcGST, calcOutstanding } from '@/lib/mis';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -52,17 +53,17 @@ export default function Loans() {
   const [dateTo, setDateTo] = useState('');
   const { user } = useCurrentUser();
 
-  useEffect(() => {
-    base44.entities.Loan.list('-created_date', 200).then(l => {
-      // Normalize status values from Excel import
-      const normalized = l.map(loan => ({
-        ...loan,
-        status: normalizeStatus(loan.status)
-      }));
-      setLoans(normalized);
-      setLoading(false);
-    });
+  const loadLoans = useCallback(async () => {
+    const l = await base44.entities.Loan.list('-created_date', 200);
+    const normalized = l.map(loan => ({
+      ...loan,
+      status: normalizeStatus(loan.status)
+    }));
+    setLoans(normalized);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadLoans(); }, [loadLoans]);
 
   const isAdmin = user?.role === 'admin';
 
@@ -102,6 +103,7 @@ export default function Loans() {
   );
 
   return (
+    <PullToRefresh onRefresh={loadLoans}>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
@@ -267,5 +269,6 @@ export default function Loans() {
         })}
       </div>
     </div>
+    </PullToRefresh>
   );
 }

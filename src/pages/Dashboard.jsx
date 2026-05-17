@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import PullToRefresh from '@/components/ui/PullToRefresh';
 import { Link } from 'react-router-dom';
 import { format, endOfMonth, differenceInDays, getYear } from 'date-fns';
 import { formatINR, formatINRFull, calcCharges, calcGST, calcOutstanding, clusterSummary, monthlyBreakdown, calcROI, avgTAT } from '@/lib/mis';
@@ -35,21 +36,21 @@ export default function Dashboard() {
     return 'follow_up';
   }
 
-  useEffect(() => {
-    Promise.all([
+  const loadData = useCallback(async () => {
+    const [l, c] = await Promise.all([
       base44.entities.Loan.list(),
       base44.entities.CapitalEntry.list(),
-    ]).then(([l, c]) => {
-      // Normalize status values
-      const normalized = l.map(loan => ({
-        ...loan,
-        status: normalizeStatus(loan.status)
-      }));
-      setLoans(normalized);
-      setCapitalEntries(c);
-      setLoading(false);
-    });
+    ]);
+    const normalized = l.map(loan => ({
+      ...loan,
+      status: normalizeStatus(loan.status)
+    }));
+    setLoans(normalized);
+    setCapitalEntries(c);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const [portfolioTab, setPortfolioTab] = useState('mtd');
 
@@ -120,6 +121,7 @@ export default function Dashboard() {
   }).sort((a, b) => a._days - b._days);
 
   return (
+    <PullToRefresh onRefresh={loadData}>
     <div className="space-y-6">
       {/* ── Section 1: Portfolio Overview — MTD / YTD tabs ── */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -384,5 +386,6 @@ export default function Dashboard() {
 
 
     </div>
+    </PullToRefresh>
   );
 }

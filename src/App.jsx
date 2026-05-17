@@ -17,6 +17,7 @@ import Admin from '@/pages/Admin';
 import Approvals from '@/pages/Approvals';
 import Ledger from '@/pages/Ledger';
 import Companies from '@/pages/Companies';
+import RepaymentAgent from '@/pages/RepaymentAgent';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -52,6 +53,7 @@ const AuthenticatedApp = () => {
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/ledger" element={<Ledger />} />
         <Route path="/companies" element={<Companies />} />
+        <Route path="/repayment-agent" element={<RepaymentAgent />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

@@ -16,6 +16,7 @@ export const AuthProvider = ({ children }) => {
     if (!session?.user) {
       setUser(null);
       setIsAuthenticated(false);
+      setAuthError({ type: 'auth_required', message: 'Authentication required' });
       setIsLoadingAuth(false);
       setAuthChecked(true);
       return;
@@ -36,9 +37,11 @@ export const AuthProvider = ({ children }) => {
         ...profile,
       });
       setIsAuthenticated(true);
+      setAuthError(null);
     } catch {
       setUser(null);
       setIsAuthenticated(false);
+      setAuthError({ type: 'auth_required', message: 'Authentication required' });
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -59,6 +62,7 @@ export const AuthProvider = ({ children }) => {
     await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
+    setAuthError({ type: 'auth_required', message: 'Authentication required' });
     if (shouldRedirect) window.location.href = '/login';
   };
 
